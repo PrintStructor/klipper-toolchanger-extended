@@ -237,7 +237,8 @@ SET_INITIAL_TOOL TOOL=0
 T1 ; Switch to Tool 1
 ```
 
-### 4. Calibrate XY offsets (e.g. with NUDGE probe)
+### 4. Calibrate XY offsets (e.g. with NUDGE probe (by zruncho3d) or similar)
+  → https://github.com/zruncho3d/nudge
 
 ```gcode
 NUDGE_FIND_TOOL_OFFSETS INITIAL_TOOL=0
@@ -302,8 +303,14 @@ Think of those docs as the **API reference** for the Klipper modules, and this r
 
 - **Core toolchanger code:**  
   Viesturs Zarins – https://github.com/viesturz/klipper-toolchanger
-- **Toolhead design inspiration:**  
+
+- **Toolhead design inspiration (ATOM):**  
   APDesign & Machine (APDM) – https://github.com/APDMachine / https://reapertoolhead.com
+
+- **NUDGE – automatic nozzle alignment probe:**  
+  Zruncho / zruncho3d – https://github.com/zruncho3d/nudge  
+  Used as the reference hardware for automatic XY tool offset calibration.
+
 - **Extended config & macros:**  
   PrintStructor – https://github.com/PrintStructor
 
