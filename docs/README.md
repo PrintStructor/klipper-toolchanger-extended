@@ -1,86 +1,123 @@
-# Documentation Index
+# Documentation – klipper-toolchanger-extended
 
-This directory contains detailed documentation for all modules in the klipper-toolchanger project.
+This folder is the **documentation hub** for the `klipper-toolchanger-extended` repository.
 
-## Core Modules
+The goal of these docs is to turn the raw Klipper modules and configs into a **practical, repeatable setup guide** for multi-tool / toolchanger printers.
 
-### [toolchanger.md](toolchanger.md)
-Main toolchanger module documentation. Covers:
-- Tool management and coordination
-- Two-stage pickup/dropoff system
-- Error handling and recovery
-- Offset management
-- Status tracking
+---
 
-### [tool.py Documentation](toolchanger.md#tool-configuration)
-Individual tool configuration and parameters:
-- Tool detection
-- Extruder and fan management
-- Per-tool offsets (XY and Z)
-- Recovery procedures
+## What This Repository Provides
 
-### [tools_calibrate.md](tools_calibrate.md)
-Tool offset calibration system:
-- XY offset calibration (NUDGE probe)
-- Z offset calibration (Beacon contact)
-- Initial tool tracking
-- Auto-save to config
+`klipper-toolchanger-extended` builds on top of Viesturs Zarins’ original [`klipper-toolchanger`](https://github.com/viesturz/klipper-toolchanger) and adds:
 
-## Additional Modules
+- A **reference multi-tool configuration** (`atom`)
+- Extended macros for safer and more robust toolchanging
+- A place for **real-world examples** and workflows
+- A structure to document how everything fits together
 
-### [tool_probe.md](tool_probe.md)
-Per-tool Z-probe support:
-- Individual probe pins per tool
-- Probe offset management
-- Multi-sample probing
-- Crash detection
+Where the original project focuses on the **core Klipper extensions**, this fork focuses on the **full stack** around them.
 
-### [rounded_path.md](rounded_path.md)
-Smooth travel path generation:
-- Cornering optimization
-- Speed change reduction
-- Arc segment generation
-- G0 move replacement
+---
 
-### [bed_thermal_adjust.md](bed_thermal_adjust.md)
-Heated bed thermal compensation:
-- Temperature loss compensation
-- Chamber temperature sensing
-- Dynamic target adjustment
+## The `atom` Reference Configuration
 
-### [manual_rail.md](manual_rail.md)
-Manual stepper rail control:
-- Multi-stepper coordination
-- Homing support
-- Position management
+Throughout the docs you will see references to a configuration called **`atom`**:
 
-## Diagrams
+- `atom` is the name of the **reference printer setup** used by the author
+- It is based on a toolhead design by **APDesign & Machine (APDM)**  
+  – see https://github.com/APDMachine and https://reapertoolhead.com
 
-### Tool Change Lifecycle
-![Lifecycle Diagram](images/Lifecycle.png)
+On a typical Klipper host, this configuration lives under:
 
-Shows the complete state machine for tool changes, including:
-- Initialization
-- Tool selection
-- Error handling
-- Recovery procedures
+```text
+printer_data/config/atom/
+```
 
-### Tool Change Sequence
-![Sequence Diagram](images/Sequence.png)
+It contains:
 
-Illustrates the detailed sequence of operations during a tool change:
-- Stage 1: Approach and detection
-- Stage 2: Final insertion
-- Position restoration
-- Offset application
+- Core toolchanger config (`toolchanger.cfg`)
+- Toolchanger macros (`toolchanger_macros.cfg`)
+- Calibration macros (`calibrate_offsets.cfg`)
+- Per-tool config (`T0.cfg`, `T1.cfg`, …)
+- Optional integrations (Beacon, LEDs, KNOMI, etc.)
 
-## Configuration Examples
+You can treat `atom` as a **working, opinionated example** and adapt it to your own printer.
 
-For complete configuration examples, see the [examples](../examples/) directory.
+---
 
-## Quick Links
+## Suggested Reading Order
 
-- [Main README](../README.md)
-- [Installation Guide](../README.md#installation)
-- [Configuration Examples](../examples/)
-- [GitHub Repository](https://github.com/PrintStructor/klipper-toolchanger)
+As the docs grow, a good reading flow will be:
+
+1. **Overview & Concepts**
+   - What the toolchanger modules do
+   - How tools, offsets and detection are modelled
+
+2. **Core Setup**
+   - Installing the Python modules (extras)
+   - Wiring and basic config of tools
+   - First successful tool change
+
+3. **Calibration**
+   - XY calibration (e.g. NUDGE)
+   - Z calibration (e.g. Beacon or similar probe)
+   - Saving offsets and validating them
+
+4. **Runtime & Safety**
+   - Tool presence monitoring
+   - Error handling & pause/resume flows
+   - Safe startup & shutdown sequences
+
+5. **Advanced Topics**
+   - Per-tool tuning (input shaper, pressure advance, etc.)
+   - Integrating with slicers (OrcaSlicer, PrusaSlicer, …)
+   - Multi-material / multi-profile setups
+
+---
+
+## How to Navigate This Folder
+
+Planned structure (may evolve over time):
+
+```text
+docs/
+├── overview.md          # High-level explanation of the stack
+├── installation.md      # Step-by-step install guide
+├── configuration.md     # How to wire configs together
+├── atom-reference.md    # Deep dive into the atom config
+├── calibration.md       # XY + Z calibration flows
+├── runtime.md           # Monitoring, errors, recovery
+└── faq.md               # Common problems & questions
+```
+
+At the moment, not all of these files may exist yet – but the goal is to fill them with **practical, battle-tested knowledge** from daily multi-tool usage.
+
+---
+
+## Upstream Documentation
+
+For details on the core modules shipped by the original project, refer to:
+
+- `toolchanger.md`
+- `tool_probe.md`
+- `tools_calibrate.md`
+- `rounded_path.md`
+
+You’ll find them in Viesturs’ repository:  
+https://github.com/viesturz/klipper-toolchanger
+
+Think of those docs as the **API reference** for the Klipper modules, and this folder as the **integration & real-world usage guide**.
+
+---
+
+## Contributing to the Docs
+
+If you:
+
+- Run a different toolchanger geometry
+- Use other probes or detection hardware
+- Have better macros, safer sequences or clearer explanations
+
+…feel free to open a PR and propose additions or corrections to the docs.
+
+Good documentation is just as important as good code – especially in the world of multi-tool Klipper setups. 🙂
