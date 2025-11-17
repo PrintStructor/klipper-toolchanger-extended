@@ -2,78 +2,106 @@
 
 The `atom` reference configuration uses **two separate sensors** for tool alignment:
 
-- **NUDGE** (by zruncho3d) for *relative XY tool offsets* between all tools.
-- **Beacon** for *Z offset* and *bed surface* calibration in Klipper.
+- **NUDGE** (by zruncho3d) for *relative XY tool offsets* between tools.
+- **Beacon** for *Z offsets* and *bed surface* calibration in Klipper.
 
-This keeps the roles clearly separated:
+The key design idea is that **every tool is calibrated as a reference tool once**.  
+This is what makes the setup more flexible than many classic “all tools relative to T0 only” approaches.
 
-- NUDGE answers:  
-  > “Where are the other nozzles in X/Y relative to my reference tool?”
-- Beacon answers:  
-  > “Where is the bed surface in Z for this tool on this build plate?”
+---
 
-### 1. XY tool alignment with NUDGE
+### 1. XY tool alignment with NUDGE (per-tool reference workflow)
 
-NUDGE is a 3-axis contact probe that can be nudged in **Z, X and Y**, allowing Klipper to measure the relative offset between any number of tools.
+NUDGE is a 3‑axis contact probe that can be nudged in **Z, X and Y**, allowing Klipper to measure the relative offset between any number of tools.
 
-In the `atom` setup:
+In the `atom` setup the XY workflow looks like this:
 
-1. A **reference tool** (usually `T0`) is chosen.
-2. All tools are jogged to the NUDGE probe in a safe position.
-3. The macro
+1. Make sure the printer is homed and all tools are mechanically in a good state.
+2. Heat **all tools** to a moderate temperature (e.g. 180 °C) so that nozzle contact is repeatable.
+3. For each tool you want to calibrate, run:
 
    ```gcode
    NUDGE_FIND_TOOL_OFFSETS INITIAL_TOOL=0
+   NUDGE_FIND_TOOL_OFFSETS INITIAL_TOOL=1
+   NUDGE_FIND_TOOL_OFFSETS INITIAL_TOOL=2
+   ...
    ```
 
-   runs a fully automatic sequence:
-   - each tool taps the probe in Z, then X and Y,
-   - Klipper calculates the ΔX/ΔY between the active tool and `T0`,
-   - the resulting offsets are written into the per-tool config (e.g. `T1.cfg`, `T2.cfg`, …).
+   – one call per tool.
 
-4. After the run you either:
-   - confirm and persist the values via `SAVE_CONFIG`, or  
-   - copy the reported offsets into your tool config manually.
+   For each call:
 
-Once this is done, all tools share a common XY coordinate system and can be used for multi-color / multi-material prints without visible misalignment.
+   - the given `INITIAL_TOOL` is treated as the **temporary reference tool**,
+   - the macro runs a fully automatic sequence with NUDGE:
+     - the tool taps the probe in Z, then X and Y,
+     - Klipper measures the XY deltas relative to this reference,
+   - the resulting XY offsets are stored **at the bottom of the corresponding tool config**  
+     (e.g. in `T1.cfg`, `T2.cfg`, …).
 
-### 2. Z offset & bed surface with Beacon
+4. After each `INITIAL_TOOL` calibration round, you run:
 
-Beacon is used as the **Z reference** for all tools. It combines a high-resolution inductive sensor with an optional contact workflow to build a Z model of the bed and the nozzle-to-bed distance.
+   ```gcode
+   SAVE_CONFIG
+   ```
 
-In the `atom` configuration the typical flow is:
+   once, so that the updated XY offsets are written back into the config files.
 
-1. **Beacon model & global Z offset for the reference tool**  
-   - Follow the Beacon docs to install and calibrate the probe (`BEACON_CALIBRATE` or `BEACON_AUTO_CALIBRATE`).  
-   - The result is a Beacon model plus a reliable Z offset for the reference tool (e.g. `T0`).
+After this procedure every tool has its **own consistent XY entry** in its config, and all tools share a common coordinate system.  
+Because each tool was treated as a reference at least once, the system can be re‑used and extended more easily (e.g. when adding or replacing tools).
 
-2. **Per-tool Z offsets using Beacon contact mode**
+---
 
-   After XY alignment via NUDGE, a macro like:
+### 2. Z offsets & bed surface with Beacon (per-tool, bed heated)
+
+Beacon is used as the **Z reference** for all tools. It combines a high‑resolution inductive sensor with an optional contact workflow to build a Z model of the bed and the nozzle‑to‑bed distance.
+
+In the `atom` configuration the Z workflow is intentionally separated from the XY workflow and is always done with a **heated bed** (and typically heated nozzles) to match real printing conditions.
+
+The typical sequence is:
+
+1. Heat the bed to your usual printing temperature.
+2. Heat the tools to a suitable calibration temperature.
+3. For each tool, run:
 
    ```gcode
    MEASURE_TOOL_Z_OFFSETS INITIAL_TOOL=0
+   MEASURE_TOOL_Z_OFFSETS INITIAL_TOOL=1
+   MEASURE_TOOL_Z_OFFSETS INITIAL_TOOL=2
+   ...
    ```
 
-   will:
+   – again, one call per tool.
 
-   - park each tool over the same probe point,
-   - use Beacon in **contact mode** to touch off the bed with each nozzle,
-   - measure the Z difference between the active tool and the reference tool,
-   - write per-tool Z offsets (e.g. `t1_z_offset`, `t2_z_offset`, …) into the config.
+   For each call:
 
-   The reference tool (`INITIAL_TOOL`) defines Z = 0; all other tools are adjusted relative to it.
+   - the `INITIAL_TOOL` is used as the active tool during the sequence,
+   - the macro parks the tool above a defined probe point,
+   - Beacon is used in **contact mode** to touch off the bed with the current nozzle,
+   - the Z difference to the internally stored reference is measured,
+   - a per‑tool Z offset (`t0_z_offset`, `t1_z_offset`, …) is written to the bottom of the corresponding tool config.
 
-3. **Normal print workflow**
+4. After a full round of `MEASURE_TOOL_Z_OFFSETS` calls, run:
 
-   Once NUDGE + Beacon calibration is complete:
+   ```gcode
+   SAVE_CONFIG
+   ```
 
-   - Homing and bed mesh use Beacon as the Z reference.
-   - The toolchanger macros automatically apply the stored XY and Z offsets when switching tools.
-   - You can optionally re-run Beacon’s contact auto-calibration periodically (or before critical prints) without touching the NUDGE XY offsets.
+   so that all updated Z offsets are persisted.
 
-### 3. Summary
+---
 
-- **NUDGE**: one-time or occasional **XY** alignment between tools – micron-level nozzle registration.  
-- **Beacon**: repeatable **Z** calibration and bed mesh, shared across all tools.  
-- The `atom` macros (`NUDGE_FIND_TOOL_OFFSETS`, `MEASURE_TOOL_Z_OFFSETS`, etc.) wrap both systems into a repeatable calibration chain that can be re-run whenever tools, nozzles or build plates are changed.
+### 3. Normal print workflow
+
+Once the above XY + Z procedures have been completed:
+
+- Homing and bed mesh use Beacon as the **global Z reference**.
+- The toolchanger macros automatically apply:
+  - the **per‑tool XY offsets** stored in each `Tn.cfg`,
+  - and the **per‑tool Z offsets** measured with Beacon.
+- You can re‑run:
+  - NUDGE‑based XY calibration after mechanical changes (tool swap, dock adjustment),
+  - Beacon‑based Z calibration whenever nozzles or build plates change,
+
+without having to rebuild the entire setup from scratch.
+
+The result is a repeatable calibration chain that keeps all tools aligned in XY and Z, while still allowing you to treat each tool as a proper first‑class reference when needed.
