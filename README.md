@@ -283,6 +283,22 @@ The extended toolchanger stack will restore position and temperatures (assuming 
 
 ---
 
+## OrcaSlicer integration (optional)
+
+This setup works great together with my OrcaSlicer post-processing script:
+
+- **orcaslicer-tool-shutdown** – automatically turns off hotends for tools after their last use to  
+  save energy and reduce oozing in multi-tool prints.  
+  Repo: https://github.com/PrintStructor/orcaslicer-tool-shutdown
+
+Recommended:
+
+- Add it as a post-processing script in OrcaSlicer  
+  (*Printer Settings → Machine G-code → Post-processing scripts*).
+- Especially useful for long multi-tool prints with high standby temperatures.
+
+---
+
 ## Docs & Further Reading
 
 - `docs/` – entry point for this repo’s documentation (work in progress)
