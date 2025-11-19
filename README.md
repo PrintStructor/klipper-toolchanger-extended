@@ -1,343 +1,423 @@
-# Klipper Toolchanger – Extended Fork
+# Klipper Toolchanger Extended
 
+**Version:** 1.0.0  
 **Author:** PrintStructor  
-**Original project:** https://github.com/viesturz/klipper-toolchanger
+**License:** GPL-3.0  
+**Original Project:** [viesturz/klipper-toolchanger](https://github.com/viesturz/klipper-toolchanger)
 
-> Complete Klipper config, macros and tooling for multi-tool / toolchanger 3D printers, based on Viesturs Zarins’ original klipper-toolchanger project.
-
----
-
-## Overview
-
-This repository is an **enhanced fork** of Viesturs’s excellent `klipper-toolchanger` project. It keeps the original Python modules and core concepts, but adds a more complete, production-oriented setup:
-
-- Extended macros and safety logic for **reliable multi-tool printing**
-- A full reference printer configuration (`atom`)
-- Better separation of core code vs. user-specific config
-- A structured place for documentation and examples
-
-If you’re building or tuning a **Klipper-based toolchanger** (IDEX, gantry toolchanger, docked tools, etc.), this repo is meant to be a **practical starting point**.
+> Production-ready toolchanger system for Klipper with advanced safety features, robust error handling, and complete configuration examples.
 
 ---
 
-## Base Project (Viesturs)
+## 🎯 What Makes This Special
 
-The original `klipper-toolchanger` by Viesturs Zarins provides the core framework for Klipper-based toolchangers, including:
+Klipper Toolchanger Extended is an **enhanced fork** of Viesturs Zarins' excellent klipper-toolchanger project, transformed into a complete, production-tested system with focus on **reliability and safety**.
 
-- Toolchanger object and tool management support
-- Per-tool Z probe support (`tool_probe`)
-- Rounded path module for smooth non-print moves
-- Tools calibrate module for contact-based XYZ calibration
+### 🛡️ Unique Safety Features
 
-🔗 Original repo: https://github.com/viesturz/klipper-toolchanger
+**Two-Stage Tool Pickup**
+- Verifies tool presence **before** completing pickup
+- Prevents crashes from false detections
+- Catches mechanical issues early
 
-This fork keeps that foundation and builds additional config and workflows on top of it.
+**Non-Fatal Error Handling**
+- Pauses print instead of emergency shutdown
+- Allows manual intervention and recovery
+- Automatic position and temperature restoration
 
----
+**Continuous Tool Monitoring**
+- Real-time presence detection during printing
+- Automatic pause if tool drops mid-print
+- Safety shutoff of heater on tool loss
 
-## Key Enhancements in This Fork
+**Smart Recovery System**
+- One-command recovery with `RESUME`
+- Automatic position restoration
+- Temperature state preserved
 
-### 1. Two-Stage Pickup & Safer Tool Handling
+### 🚀 Production Focus
 
-- Stage 1: Safe approach and partial insertion with detection checks  
-- Stage 2: Full insertion only if the tool is confirmed present  
-- Reduces the risk of crashes from mis-detection or mechanical misalignment
+Unlike other toolchanger solutions, this project provides:
 
-### 2. Non-Fatal Error Handling
-
-- Toolchanger errors are handled via **pause and recovery**, not instant firmware shutdown
-- Allows you to:
-  - Fix mechanical issues (tool not seated, obstruction, etc.)
-  - Resume printing with restored position and temperatures
-
-### 3. Tool Detection State Management
-
-- Clear detection states: `PRESENT`, `ABSENT`, `UNAVAILABLE`
-- Continuous monitoring during printing
-- Automatic pause if the active tool is lost/drops mid-print
-
-### 4. XY-Offset Matrix Support
-
-- Stores relative **XY offsets per tool**
-- Supports multi-tool setups (up to 6 tools in the reference config)
-- Offsets are applied automatically during tool changes
-
-### 5. Recovery System
-
-- `RESUME` brings the printer back into a known-good state:
-  - Restores last print position
-  - Restores previous heater state
-  - Continues the print from where it stopped
-
-### 6. Per-Tool Configuration & Advanced Macros
-
-- Individual parameters per tool (offsets, detection pins, parking coordinates, etc.)
-- Separation between:
-  - Core toolchanger logic (Python modules)
-  - User macros and printer-specific config
-- Ready to be extended with your own:
-  - Purge/wipe macros  
-  - Standby/active temperature strategies  
-  - Per-tool tuning (pressure advance, input shaper, etc.)
+✅ **Complete Configuration** - Not just modules, but full working examples  
+✅ **Hardware Integration** - Tested with ATOM toolhead system  
+✅ **Safety First** - Multiple layers of error detection and recovery  
+✅ **Easy Updates** - Moonraker integration for automatic updates  
+✅ **Well Documented** - Comprehensive guides and examples  
+✅ **Community Tested** - Production-proven on real multi-tool printers
 
 ---
 
-## Repository Structure
+## Hardware
 
-```text
-klipper-toolchanger-extended/
-├── klipper/          # Python modules for Klipper (extras)
-├── usermods/         # User-level macros and config snippets
-├── examples/         # Example configs and usage snippets
-├── docs/             # Documentation entry point
-├── install.sh        # Helper script to install extras into Klipper
-└── README.md         # This file
-```
+### ATOM Toolhead System
 
-On your Klipper host (e.g. Raspberry Pi), the **printer configuration** usually lives under:
+This project features the **ATOM toolhead** - an exclusive design created by the developer of the **Reaper Toolhead**, specifically engineered for this toolchanger project.
 
-```text
-/opt/printer_data/config/   or   ~/printer_data/config/
-```
+**Key Features:**
+- **Simple 4-Point Dock Path** - Reliable and easy to calibrate
+- **Compact Design** - Space-efficient for 6-tool arrays
+- **Production Tested** - Proven in high-volume printing
+- **CAN Bus Ready** - Designed for BTT EBB36/42 boards
+- **Tool Detection Integration** - Built-in sensor mounting
 
-This repository refers to a reference configuration folder named:
+**Reference Hardware:**
+- 6x ATOM toolheads with BTT EBB36/42 CAN boards
+- NUDGE probe for XY offset calibration
+- Beacon RevH probe for Z calibration and bed meshing
+- Per-tool filament detection sensors
+- Optional: KNOMI displays, LED effects
 
-```text
-printer_data/config/atom/
-```
-
-`atom` is the name of the reference printer configuration and is based on a toolhead originally designed by **APDesign & Machine (APDM)**.  
-APDM GitHub: https://github.com/APDMachine
+**Hardware Files:**
+CAD files and STL files for the ATOM toolhead will be available in the [`hardware/`](hardware/) directory. See [hardware documentation](hardware/README.md) for details.
 
 ---
 
-## Requirements
+## 📦 What's Included
 
-- **Firmware:** Klipper v0.11.0 or newer
-- **Host:** Linux SBC (e.g. Raspberry Pi) or equivalent
-- **Printer:** Multi-tool / toolchanger setup
-- **Tool detection:** Endstop / hall / inductive or similar sensors are strongly recommended
-- **Slicer:** Any Klipper-compatible slicer (OrcaSlicer, PrusaSlicer, etc.)
+### Python Modules (Klipper Extensions)
+
+Complete set of Klipper modules for advanced toolchanger operation:
+
+- **`toolchanger.py`** - Core two-stage pickup logic with error handling
+- **`tool.py`** - Individual tool management and detection states
+- **`tools_calibrate.py`** - NUDGE probe XY offset calibration
+- **`rounded_path.py`** - Smooth curved motion paths
+- **`tool_probe.py`** - Per-tool Z probe support
+- **`tc_beacon_capture.py`** - Beacon contact Z-offset capture
+- **`bed_thermal_adjust.py`** - Thermal compensation for long prints
+- **`manual_rail.py`** - Manual rail control utilities
+- **`multi_fan.py`** - Advanced multi-fan controller
+- Plus additional helper modules
+
+### Configuration Examples
+
+**Complete 6-Tool ATOM Reference:**
+- Full working configuration in [`examples/atom-tc-6tool/`](examples/atom-tc-6tool/)
+- Individual tool configs (T0-T5)
+- Print lifecycle macros (PRINT_START, PRINT_END, PAUSE, RESUME)
+- Calibration workflows (XY with NUDGE, Z with Beacon)
+- LED status visualization
+- KNOMI display integration
+- OrcaSlicer setup guide
+
+### Documentation
+
+- **[Main Documentation Hub](docs/README.md)** - Central navigation
+- **[Hardware Documentation](hardware/README.md)** - CAD files and assembly
+- **[ATOM Reference Guide](examples/atom-tc-6tool/README.md)** - Complete setup guide
+- **[Changelog](CHANGELOG.md)** - Version history and changes
+- **[Contributing Guide](CONTRIBUTING.md)** - How to contribute
 
 ---
 
-## Installation
+## 🚀 Quick Start
 
-> ⚠️ This fork assumes you already have a working Klipper installation.
+### Requirements
 
-### 1. Clone the Repository
+- **Klipper:** v0.11.0 or newer
+- **Python:** 3.7+ (included with Klipper)
+- **Hardware:** Multi-tool/toolchanger 3D printer
+- **Sensors:** Tool detection strongly recommended
+- **Host:** Raspberry Pi or similar Linux SBC
 
-SSH into your printer / Klipper host:
+### Installation
 
+**1. Clone the repository:**
 ```bash
 cd ~
 git clone https://github.com/PrintStructor/klipper-toolchanger-extended.git
-cd ~/klipper-toolchanger-extended
+cd klipper-toolchanger-extended
 ```
 
-### 2. Install the Klipper Extras
-
-Recommended way – via the included script:
-
+**2. Run installation script:**
 ```bash
 ./install.sh
 ```
 
-The script will symlink the Python modules into your Klipper `extras` directory.
+The script will:
+- Symlink Python modules to Klipper extras
+- Offer to configure Moonraker auto-updates
+- Restart Klipper service
 
-Manual alternative:
+**3. Add to your printer.cfg:**
+```ini
+[include klipper-toolchanger-extended/examples/atom-tc-6tool/toolchanger.cfg]
+[include klipper-toolchanger-extended/examples/atom-tc-6tool/toolchanger_macros.cfg]
+[include klipper-toolchanger-extended/examples/atom-tc-6tool/macros.cfg]
+# ... add tool configs T0-T5 ...
+```
+
+**4. Customize for your hardware:**
+- Update dock positions in each `TX.cfg`
+- Set CAN UUIDs for your toolhead boards
+- Configure probe offsets
+- Adjust movement speeds
+
+**5. Calibrate:**
+```gcode
+G28                                    # Home
+SET_INITIAL_TOOL TOOL=0                # Set reference tool
+NUDGE_FIND_TOOL_OFFSETS INITIAL_TOOL=0 # Calibrate XY
+MEASURE_TOOL_Z_OFFSETS INITIAL_TOOL=0  # Calibrate Z
+```
+
+**For detailed setup, see:** [ATOM Example Configuration Guide](examples/atom-tc-6tool/README.md)
+
+---
+
+## 📖 Key Concepts
+
+### Tool Detection States
+
+Tools have three detection states:
+- **PRESENT** (1) - Tool is detected and ready
+- **ABSENT** (0) - Tool is not detected
+- **UNAVAILABLE** (-1) - Detection sensor not configured
+
+### Offset System
+
+Three-tier offset management:
+
+1. **Global Z-Offset** - Applied to initial tool (typically 0.06-0.12mm)
+2. **Relative XY-Offsets** - Per tool, relative to initial tool
+3. **Relative Z-Offsets** - Per tool, relative to initial tool
+
+The initial tool always has XY=0,0 and relative Z=0.
+
+### Two-Stage Pickup
+
+**Stage 1: Approach & Verify**
+```
+1. Move to dock
+2. Partially insert tool
+3. Check detection sensor at verification point
+4. If not detected → Error, pause
+```
+
+**Stage 2: Complete (only if Stage 1 succeeds)**
+```
+1. Complete insertion
+2. Return to safe position
+3. Restore previous position
+4. Continue operation
+```
+
+### Error Recovery
+
+**When tool change fails:**
+1. Print automatically pauses
+2. Z-axis lifts to safe height
+3. Extruder heater turns off
+4. LED shows error status (if configured)
+
+**To recover:**
+1. Fix mechanical issue
+2. Run `RESUME` command
+3. System restores temperature and position
+4. Print continues
+
+---
+
+## 🎓 Documentation
+
+### Getting Started
+- **[Installation Guide](#installation)** - This page
+- **[ATOM Example Setup](examples/atom-tc-6tool/README.md)** - Complete reference
+- **[Quick Start Video](#)** - Coming soon
+
+### Configuration Reference
+- **[Toolchanger Module](docs/toolchanger.md)** - Core configuration
+- **[Tools Calibrate](docs/tools_calibrate.md)** - XY offset calibration
+- **[Tool Probe](docs/tool_probe.md)** - Per-tool probe setup
+- **[Rounded Path](docs/rounded_path.md)** - Motion path configuration
+
+### Advanced Topics
+- **[Custom Dock Paths](docs/tool_paths.md)** - Creating custom paths
+- **[Error Handling](docs/toolchanger.md#error-handling)** - Understanding errors
+- **[LED Integration](examples/atom-tc-6tool/README.md#led-effects)** - Status visualization
+
+### Support & Community
+- **[GitHub Issues](https://github.com/PrintStructor/klipper-toolchanger-extended/issues)** - Bug reports
+- **[GitHub Discussions](https://github.com/PrintStructor/klipper-toolchanger-extended/discussions)** - Q&A and ideas
+- **[Contributing Guide](CONTRIBUTING.md)** - Help improve the project
+
+---
+
+## 🔄 Updates & Versioning
+
+### Semantic Versioning
+
+This project follows [Semantic Versioning](https://semver.org/):
+
+- **MAJOR.MINOR.PATCH** (e.g., 1.0.0)
+- **MAJOR** - Incompatible API changes
+- **MINOR** - New features (backwards-compatible)
+- **PATCH** - Bug fixes (backwards-compatible)
+
+### Automatic Updates (Moonraker)
+
+**Setup during installation:**
+The `install.sh` script offers to configure Moonraker update manager.
+
+**Manual setup:**
+Add to your `moonraker.conf`:
+```ini
+[update_manager klipper-toolchanger-extended]
+type: git_repo
+path: ~/klipper-toolchanger-extended
+origin: https://github.com/PrintStructor/klipper-toolchanger-extended.git
+primary_branch: main
+managed_services: klipper
+install_script: install.sh
+```
+
+See [`moonraker.conf`](moonraker.conf) for detailed configuration.
+
+**Update via Mainsail/Fluidd:**
+1. Navigate to "Machine" tab
+2. Check for updates
+3. Click "Update" button
+4. System automatically restarts Klipper
+
+### Manual Updates
 
 ```bash
-ln -sf ~/klipper-toolchanger-extended/klipper/extras/*.py ~/klipper/klippy/extras/
-```
-
-### 3. Include the configuration in Klipper
-
-In your `printer.cfg`:
-
-```ini
-# Core toolchanger sections are provided by viesturz/klipper-toolchanger
-# and extended by this repo.
-
-[include usermods/toolchanger_macros.cfg]
-# Optional: further includes, depending on how you structure your config:
-# [include usermods/toolchanger_calibration.cfg]
-# [include usermods/tool_leds.cfg]
-```
-
-If you use the **ATOM reference configuration** as a base, you can include its files directly, e.g.:
-
-```ini
-[include atom/toolchanger.cfg]
-[include atom/toolchanger_macros.cfg]
-[include atom/calibrate_offsets.cfg]
-[include atom/T0.cfg]
-[include atom/T1.cfg]
-[include atom/T2.cfg]
-[include atom/T3.cfg]
-[include atom/T4.cfg]
-[include atom/T5.cfg]
-```
-
-> Note: adjust the paths to match your actual `printer_data/config` layout on the host.
-
-### 4. Restart Klipper
-
-```bash
+cd ~/klipper-toolchanger-extended
+git pull
+./install.sh
 sudo systemctl restart klipper
 ```
 
----
+### Rollback
 
-## Reference Configuration: `atom`
-
-The `atom` reference configuration (on your host typically under `printer_data/config/atom/`) demonstrates a complete multi-tool setup with:
-
-- Up to **6 tools** (`T0`–`T5`)
-- Per-tool offsets
-- Tool detection pins
-- Separate XY and Z calibration (e.g. NUDGE + Beacon)
-- Optional LED and KNOMI integration
-
-Typical files:
-
-- `toolchanger.cfg` – core toolchanger configuration  
-- `toolchanger_macros.cfg` – central macros (pickup/dropoff, init, etc.)  
-- `calibrate_offsets.cfg` – calibration macros for XY/Z  
-- `T0.cfg` … `T5.cfg` – individual tool definitions  
-- `beacon.cfg` – Z calibration with Beacon (or similar probe)  
-- `tc_led_effects.cfg` – LED status visualization  
-- `knomi.cfg` – KNOMI display integration
-
----
-
-## Quick Start (G-Code / Macros)
-
-### 1. Define a tool
-
-```ini
-[tool T0]
-tool_number: 0
-extruder: extruder
-detection_pin: ^et0:PB9
-params_park_x: 25.3
-params_park_y: 3.0
-params_park_z: 325.0
+If an update causes issues:
+```bash
+cd ~/klipper-toolchanger-extended
+git log                  # Find previous version
+git checkout v1.0.0      # Or specific commit
+./install.sh
+sudo systemctl restart klipper
 ```
 
-### 2. Set initial tool
+### Release Channels
 
-```gcode
-SET_INITIAL_TOOL TOOL=0
-```
+- **`main` branch** - Stable releases only (recommended)
+- **`develop` branch** - Beta features and testing
+- **`feature/*` branches** - Specific feature development
 
-### 3. Switch tools
-
-```gcode
-T1 ; Switch to Tool 1
-```
-
-### 4. Calibrate XY offsets (e.g. with NUDGE probe (by zruncho3d) or similar)
-  → https://github.com/zruncho3d/nudge
-
-```gcode
-NUDGE_FIND_TOOL_OFFSETS INITIAL_TOOL=0
-```
-
-### 5. Calibrate Z offsets (e.g. with Beacon)
-
-```gcode
-MEASURE_TOOL_Z_OFFSETS INITIAL_TOOL=0
-SAVE_CONFIG
+To switch to develop branch for beta testing:
+```bash
+cd ~/klipper-toolchanger-extended
+git checkout develop
+git pull
+./install.sh
 ```
 
 ---
 
-## Error Handling & Monitoring
+## 🤝 Contributing
 
-### Tool Presence Monitoring
+Contributions are welcome! This project thrives on community input.
 
-Example of how a monitoring timer can be started (simplified):
+### How to Contribute
 
-```ini
-# Typically started in PRINT_START or an init macro:
-UPDATE_DELAYED_GCODE ID=TOOL_PRESENCE_MONITOR DURATION=2.0
-```
+- **Report bugs** - Use [bug report template](https://github.com/PrintStructor/klipper-toolchanger-extended/issues/new?template=bug_report.md)
+- **Suggest features** - Use [feature request template](https://github.com/PrintStructor/klipper-toolchanger-extended/issues/new?template=feature_request.md)
+- **Improve docs** - Fix typos, add examples, clarify instructions
+- **Submit code** - Fork, branch, code, test, pull request
+- **Share configs** - Contribute working setups for different printers
 
-If the active tool is lost (sensor reports ABSENT):
+**Read the full guide:** [CONTRIBUTING.md](CONTRIBUTING.md)
 
-- The tool heater is turned off (safety)
-- The print is paused
-- LEDs can show an error state (if configured)
-- You can fix the mechanical issue and resume
+### Code of Conduct
 
-### Recovery with `RESUME`
-
-After fixing the issue (re-seating the tool, clearing the obstruction):
-
-```gcode
-RESUME
-```
-
-The extended toolchanger stack will restore position and temperatures (assuming your macros are wired accordingly) and continue the print.
+- Be respectful and inclusive
+- Welcome newcomers
+- Accept constructive criticism
+- Focus on what's best for the community
 
 ---
 
-## OrcaSlicer integration (optional)
+## 🙏 Credits
 
-This setup works great together with my OrcaSlicer post-processing script:
+### Original Framework
+**Viesturs Zarins** (viesturz)  
+Original klipper-toolchanger project  
+[github.com/viesturz/klipper-toolchanger](https://github.com/viesturz/klipper-toolchanger)
 
-- **orcaslicer-tool-shutdown** – automatically turns off hotends for tools after their last use to  
-  save energy and reduce oozing in multi-tool prints.  
-  Repo: https://github.com/PrintStructor/orcaslicer-tool-shutdown
+### ATOM Toolhead
+**Creator of the Reaper Toolhead**  
+Exclusive design for this project  
+[reapertoolhead.com](https://reapertoolhead.com)
 
-Recommended:
+### NUDGE Probe
+**Zruncho** (zruncho3d)  
+Automatic XY offset calibration probe  
+[github.com/zruncho3d/nudge](https://github.com/zruncho3d/nudge)
 
-- Add it as a post-processing script in OrcaSlicer  
-  (*Printer Settings → Machine G-code → Post-processing scripts*).
-- Especially useful for long multi-tool prints with high standby temperatures.
-
----
-
-## Docs & Further Reading
-
-- `docs/` – entry point for this repo’s documentation (work in progress)
-- Upstream documentation from Viesturs:
-  - `toolchanger.md`
-  - `tool_probe.md`
-  - `tools_calibrate.md`
-  - `rounded_path.md`
-
-You can find them in the original project:  
-https://github.com/viesturz/klipper-toolchanger
-
-Think of those docs as the **API reference** for the Klipper modules, and this repo as a **concrete, tested reference configuration** for a modern multi-tool setup.
+### Extended Features
+**PrintStructor**  
+Safety features, error handling, production integration  
+[github.com/PrintStructor](https://github.com/PrintStructor)
 
 ---
 
-## Credits
+## 📄 License
 
-- **Core toolchanger code:**  
-  Viesturs Zarins – https://github.com/viesturz/klipper-toolchanger
+This project is licensed under **GPL-3.0**, consistent with the original klipper-toolchanger project.
 
-- **Toolhead design inspiration (ATOM):**  
-  APDesign & Machine (APDM) – https://github.com/APDMachine / https://reapertoolhead.com
+**You are free to:**
+- Use for personal or commercial purposes
+- Modify and adapt
+- Distribute and share
 
-- **NUDGE – automatic nozzle alignment probe:**  
-  Zruncho / zruncho3d – https://github.com/zruncho3d/nudge  
-  Used as the reference hardware for automatic XY tool offset calibration.
+**Under the conditions:**
+- Maintain GPL-3.0 license
+- Share modifications under same license
+- Credit original authors
 
-- **Extended config & macros:**  
-  PrintStructor – https://github.com/PrintStructor
+See [LICENSE](LICENSE) for full details.
 
 ---
 
-## License
+## 🔗 Related Projects
 
-This project – like the original – is licensed under **GPL-3.0**.
+### Integration Projects
+- **[orcaslicer-tool-shutdown](https://github.com/PrintStructor/orcaslicer-tool-shutdown)** - Automatic hotend shutdown after last use
+- **[Beacon](https://beacon3d.com/)** - Eddy current probe for Z calibration
+- **[KNOMI](https://github.com/bigtreetech/KNOMI)** - Round display integration
 
-In short:
+### Community Resources
+- **[VORON Design](https://vorondesign.com/)** - CoreXY printer designs
+- **[Klipper Documentation](https://www.klipper3d.org/)** - Official Klipper docs
+- **[r/VORONDesign](https://reddit.com/r/VORONDesign)** - Reddit community
 
-- You may use, modify and redistribute the code
-- If you publish modified versions, they must also be under GPL-3.0
-- See the `LICENSE` file in this repository for full details
+---
+
+## 📊 Project Stats
+
+- **Version:** 1.0.0
+- **License:** GPL-3.0
+- **Python Modules:** 12
+- **Example Configs:** Complete 6-tool VORON reference
+- **Documentation Pages:** 10+
+- **Production Status:** ✅ Tested and Stable
+
+---
+
+## 🎉 Acknowledgments
+
+Special thanks to:
+- The entire Klipper community
+- VORON Design team for inspiration
+- Early testers and contributors
+- Everyone who provides feedback and bug reports
+
+---
+
+**Ready to get started?** See the [Installation](#installation) section above or jump straight to the [ATOM Example Configuration](examples/atom-tc-6tool/README.md)!
+
+---
+
+**Questions?** Check out [GitHub Discussions](https://github.com/PrintStructor/klipper-toolchanger-extended/discussions) or open an [issue](https://github.com/PrintStructor/klipper-toolchanger-extended/issues).

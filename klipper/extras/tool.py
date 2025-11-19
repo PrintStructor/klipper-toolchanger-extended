@@ -20,12 +20,19 @@
 
 from . import toolchanger
 
+# ==============================================================================
+#                              Tool Class
+# ==============================================================================
+
 class Tool:
 
     def __init__(self, config):
+        # ==============================================================================
+        #                          Initialization
+        # ==============================================================================
         self.printer = config.get_printer()
         self.config = config
-        self.gcode = self.printer.lookup_object('gcode')  # gcode is initialized here
+        self.gcode = self.printer.lookup_object('gcode')
         self.params = config.get_prefix_options('params_')
         self.gcode_macro = self.printer.load_object(config, 'gcode_macro')
         self.name = config.get_name()
@@ -41,11 +48,12 @@ class Tool:
             config, 'before_change_gcode', self._config_get(config, 'before_change_gcode', ''))
         self.after_change_gcode = self.gcode_macro.load_template(
             config, 'after_change_gcode', self._config_get(config, 'after_change_gcode', ''))
-<<<<<<< HEAD
+        
         # Recovery G-code for error handling
         self.recover_gcode = self.gcode_macro.load_template(
             config, 'recover_gcode', self._config_get(config, 'recover_gcode', ''))
-        # --- new: split pickup/dropoff into two stages ---
+        
+        # Split pickup/dropoff into two stages
         self.pickup_gcode_stage1 = self.gcode_macro.load_template(
             config, 'pickup_gcode_stage1', self._config_get(config, 'pickup_gcode_stage1', ''))
         self.pickup_gcode_stage2 = self.gcode_macro.load_template(
@@ -59,16 +67,6 @@ class Tool:
         self.gcode_y_offset = self._config_getfloat(config, 'gcode_y_offset', 0.0)
         self.gcode_z_offset = self._config_getfloat(config, 'gcode_z_offset', 0.0)
 
-=======
-        self.recover_gcode = self.gcode_macro.load_template(
-            config, 'recover_gcode', self._config_get(config, 'recover_gcode', ''))
-        self.gcode_x_offset = self._config_getfloat(
-            config, 'gcode_x_offset', 0.0)
-        self.gcode_y_offset = self._config_getfloat(
-            config, 'gcode_y_offset', 0.0)
-        self.gcode_z_offset = self._config_getfloat(
-            config, 'gcode_z_offset', 0.0)
->>>>>>> a85befe6eab3ab4da6a1de283d80b69f64b8dee7
         self.params = {**self.toolchanger.params, **toolchanger.get_params_dict(config)}
         self.original_params = {}
 
@@ -91,7 +89,7 @@ class Tool:
         max_tool_count = self.toolchanger.params.get('max_tool_count', 6)
         self.z_offsets = {}
         for i in range(max_tool_count):
-            if i != self.tool_number:  # no offset to the same tool
+            if i != self.tool_number:
                 offset_name = f't{i}_z_offset'
                 offset = config.getfloat(offset_name, None)
                 if offset is not None:
@@ -100,7 +98,7 @@ class Tool:
         # X-Y offset matrix (dynamically sized based on toolchanger config)
         self.xy_offsets = {}
         for i in range(max_tool_count):
-            if i != self.tool_number:  # no offset to the same tool
+            if i != self.tool_number:
                 offset_name = f't{i}_xy_offset'
                 offset = config.get(offset_name, None)
                 if offset is not None:
@@ -123,9 +121,10 @@ class Tool:
         # Non-fatal command error policy
         self._pause_on_error = True
 
-    # ---------------------------
-    # Non-fatal error utilities
-    # ---------------------------
+    # ==============================================================================
+    #                       Non-fatal Error Utilities
+    # ==============================================================================
+    
     def _report_nonfatal(self, gcmd, msg):
         """Visible error without raising (prevents shutdown)."""
         try:
@@ -148,9 +147,10 @@ class Tool:
             except Exception:
                 pass
 
-    # ---------------------------
-    # Event handlers
-    # ---------------------------
+    # ==============================================================================
+    #                          Event Handlers
+    # ==============================================================================
+    
     def _handle_connect(self):
         # Resolve optional objects defensively
         try:
@@ -183,9 +183,10 @@ class Tool:
         except Exception as e:
             self.gcode.respond_info(f"Tool detect state update failed: {e}")
 
-    # ---------------------------
-    # Status & offsets
-    # ---------------------------
+    # ==============================================================================
+    #                        Status & Offsets
+    # ==============================================================================
+    
     def get_status(self, eventtime):
         active = False
         try:
@@ -207,7 +208,7 @@ class Tool:
             'gcode_z_offset': self.gcode_z_offset if self.gcode_z_offset else 0.0,
             'z_offsets': self.z_offsets,
             'xy_offsets': self.xy_offsets,
-            'detect_state': self.detect_state,  # CRITICAL FIX: Export detection state!
+            'detect_state': self.detect_state,
         }
 
     def get_offset(self):
@@ -225,9 +226,10 @@ class Tool:
         """Return the stored X-Y offset to another tool."""
         return self.xy_offsets.get(tool_number, [0.0, 0.0])
 
-    # ---------------------------
-    # Convenience properties for stage access
-    # ---------------------------
+    # ==============================================================================
+    #                    Convenience Properties (Stage Access)
+    # ==============================================================================
+    
     @property
     def before_change(self):
         return self.before_change_gcode
@@ -252,9 +254,10 @@ class Tool:
     def dropoff_stage2(self):
         return self.dropoff_gcode_stage2
 
-    # ---------------------------
-    # Recovery
-    # ---------------------------
+    # ==============================================================================
+    #                          Recovery System
+    # ==============================================================================
+    
     def recover(self, gcmd):
         """Recovery procedure for this tool after an error."""
         if not self.recover_gcode:
@@ -275,40 +278,34 @@ class Tool:
         }
 
         try:
-            # run_gcode of toolchanger is already non-fatal, but we still guard
             self.toolchanger.run_gcode('tool.recover_gcode', self.recover_gcode, extra_context)
             try:
                 gcmd.respond_info(f"Recovery completed for {self.name}")
             except Exception:
                 pass
         except Exception as e:
-            # Non-fatal: report & pause, then return
             self._report_nonfatal(gcmd, f"Recovery failed for {self.name}: {e}")
             self._pause_print()
             return
 
     cmd_RECOVER_TOOL_help = 'Attempt to recover this tool from error state'
+    
     def cmd_RECOVER_TOOL(self, gcmd):
         self.recover(gcmd)
 
-    # ---------------------------
-    # Assignment
-    # ---------------------------
+    # ==============================================================================
+    #                      Assignment & Registration
+    # ==============================================================================
+    
     cmd_ASSIGN_TOOL_help = 'Assign tool to tool number'
+    
     def cmd_ASSIGN_TOOL(self, gcmd):
-<<<<<<< HEAD
-        # In some setups get_int is used; in others getint is patched. Keep your variant.
         try:
-            # Prefer get_int if available
-            getter = getattr(gcmd, 'get_int', None) or getattr(gcmd, 'getint')
-            number = getter('N', minval=0)
+            number = gcmd.get_int('N', minval=0)
         except Exception as e:
             self._report_nonfatal(gcmd, f"ASSIGN_TOOL: invalid or missing N: {e}")
             self._pause_print()
             return
-=======
-        self.assign_tool(gcmd.get_int('N', minval=0), replace = True)
->>>>>>> a85befe6eab3ab4da6a1de283d80b69f64b8dee7
 
         try:
             self.assign_tool(number, replace=True)
@@ -317,7 +314,6 @@ class Tool:
             except Exception:
                 pass
         except Exception as e:
-            # Non-fatal: report & optionally pause
             self._report_nonfatal(gcmd, f"ASSIGN_TOOL failed for {self.name}: {e}")
             self._pause_print()
             return
@@ -325,8 +321,6 @@ class Tool:
     def assign_tool(self, number, replace=False):
         prev_number = self.tool_number
         self.tool_number = number
-        # assign_tool on toolchanger can raise on config issues; okay outside command paths,
-        # but here it's called from cmd_* and _handle_connect (guarded above).
         self.main_toolchanger.assign_tool(self, number, prev_number, replace)
         self.register_t_gcode(number)
 
@@ -336,7 +330,6 @@ class Tool:
         desc = 'Select tool %d' % (number)
         existing = gcode.register_command(name, None)
         if existing:
-            # Do not interfere with existing registration
             gcode.register_command(name, existing)
         else:
             tc = self.main_toolchanger
@@ -345,7 +338,6 @@ class Tool:
                 try:
                     tc.select_tool(gcmd, tc.lookup_tool(number), axis)
                 except Exception as e:
-                    # Non-fatal: convert selection failure to visible error
                     try:
                         gcmd.respond_error(f"T{number} selection failed: {e}")
                     except Exception:
@@ -360,16 +352,16 @@ class Tool:
                     return
             gcode.register_command(name, _select, desc=desc)
 
-    # ---------------------------
-    # Activation / deactivation
-    # ---------------------------
+    # ==============================================================================
+    #                      Activation / Deactivation
+    # ==============================================================================
+    
     def activate(self):
         toolhead = self.printer.lookup_object('toolhead')
         gcode = self.printer.lookup_object('gcode')
         hotend_extruder = toolhead.get_extruder().name
         if self.extruder_name and self.extruder_name != hotend_extruder:
             gcode.run_script_from_command("ACTIVATE_EXTRUDER EXTRUDER='%s'" % (self.extruder_name,))
-        # Do NOT set any offset here!
         if self.extruder_stepper and hotend_extruder:
             gcode.run_script_from_command(
                 "SYNC_EXTRUDER_MOTION EXTRUDER='%s' MOTION_QUEUE=" % (hotend_extruder, ))
@@ -390,15 +382,22 @@ class Tool:
                 "SYNC_EXTRUDER_MOTION EXTRUDER='%s' MOTION_QUEUE=%s" %
                 (hotend_extruder, hotend_extruder,))
 
-    # ---------------------------
-    # Config helpers
-    # ---------------------------
+    # ==============================================================================
+    #                          Config Helpers
+    # ==============================================================================
+    
     def _config_get(self, config, name, default_value):
         return config.get(name, self.toolchanger.config.get(name, default_value))
+    
     def _config_getfloat(self, config, name, default_value):
         return config.getfloat(name, self.toolchanger.config.getfloat(name, default_value))
+    
     def _config_getboolean(self, config, name, default_value):
         return config.getboolean(name, self.toolchanger.config.getboolean(name, default_value))
+
+# ==============================================================================
+#                          Module Hooks
+# ==============================================================================
 
 def load_config(config):
     return Tool(config)
@@ -406,8 +405,10 @@ def load_config(config):
 def load_config_prefix(config):
     return Tool(config)
 
+# ==============================================================================
+#                          Utility Functions
+# ==============================================================================
 
-# --- small utility ---
 def _safe(x):
     try:
         return str(x)

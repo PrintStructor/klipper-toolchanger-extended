@@ -21,6 +21,10 @@
 
 import logging
 
+# ==============================================================================
+#                         Constants & Helpers
+# ==============================================================================
+
 direction_types = {'x+': [0, +1], 'x-': [0, -1], 'y+': [1, +1], 'y-': [1, -1],
                    'z+': [2, +1], 'z-': [2, -1]}
 
@@ -31,9 +35,15 @@ position so the probe can travel further (the minimum
 position can be negative).
 """
 
+# ==============================================================================
+#                         ToolsCalibrate Class
+# ==============================================================================
 
 class ToolsCalibrate:
     def __init__(self, config):
+        # ==============================================================================
+        #                          Initialization
+        # ==============================================================================
         self.printer = config.get_printer()
         self.name = config.get_name()
         self.gcode_move = self.printer.load_object(config, "gcode_move")
@@ -81,6 +91,10 @@ class ToolsCalibrate:
         self.gcode.register_command('TOOL_SAVE_Z_OFFSET',
                                     self.cmd_TOOL_SAVE_Z_OFFSET,
                                     desc=self.cmd_TOOL_SAVE_Z_OFFSET_help)
+
+    # ==============================================================================
+    #                          Probing Methods
+    # ==============================================================================
  
     def probe_xy(self, toolhead, top_pos, direction, gcmd, samples=None):
         offset = direction_types[direction]
@@ -129,6 +143,10 @@ class ToolsCalibrate:
                              self.travel_speed)
         toolhead.set_position(position)
         return [center_x, center_y, center_z]
+
+    # ==============================================================================
+    #                          G-Code Commands
+    # ==============================================================================
 
     cmd_TOOL_LOCATE_SENSOR_help = ("Locate the tool calibration sensor, "
                                    "use with tool 0.")
@@ -262,23 +280,8 @@ class ToolsCalibrate:
         toolhead.move(start_pos, self.travel_speed)
         toolhead.set_position(start_pos)
 
-    def get_status(self, eventtime):
-        return {'last_result': self.last_result,
-                'last_probe_offset': self.last_probe_offset,
-                'calibration_probe_inactive': self.calibration_probe_inactive,
-                'last_x_result': self.last_result[0],
-                'last_y_result': self.last_result[1],
-                'last_z_result': self.last_result[2]}
-
-    cmd_TOOL_CALIBRATE_QUERY_PROBE_help = "Return the state of calibration probe"
-    def cmd_TOOL_CALIBRATE_QUERY_PROBE(self, gcmd):
-        toolhead = self.printer.lookup_object('toolhead')
-        print_time = toolhead.get_last_move_time()
-        endstop_states = [probe.query_endstop(print_time) for probe in self.probe_multi_axis.mcu_probe]  # Check the state of each axis probe (x, y, z)
-        self.calibration_probe_inactive = any(endstop_states)
-        gcmd.respond_info("Calibration Probe: %s" % (["open", "TRIGGERED"][any(endstop_states)]))
-
     cmd_TOOL_SAVE_Z_OFFSET_help = "Save Z-offset for a tool relative to initial tool"
+    
     def cmd_TOOL_SAVE_Z_OFFSET(self, gcmd):
         """Save Z-offset for a tool relative to initial tool (used by Beacon calibration)"""
         tool_number = gcmd.get_int('TOOL')
@@ -298,6 +301,30 @@ class ToolsCalibrate:
                       f"{z_offset:.6f}")
         
         gcmd.respond_info(f"Saved T{tool_number} Z-offset relative to T{self.initial_tool.tool_number}: {z_offset:.6f}")
+
+    # ==============================================================================
+    #                          Status & Query
+    # ==============================================================================
+
+    def get_status(self, eventtime):
+        return {'last_result': self.last_result,
+                'last_probe_offset': self.last_probe_offset,
+                'calibration_probe_inactive': self.calibration_probe_inactive,
+                'last_x_result': self.last_result[0],
+                'last_y_result': self.last_result[1],
+                'last_z_result': self.last_result[2]}
+
+    cmd_TOOL_CALIBRATE_QUERY_PROBE_help = "Return the state of calibration probe"
+    def cmd_TOOL_CALIBRATE_QUERY_PROBE(self, gcmd):
+        toolhead = self.printer.lookup_object('toolhead')
+        print_time = toolhead.get_last_move_time()
+        endstop_states = [probe.query_endstop(print_time) for probe in self.probe_multi_axis.mcu_probe]  # Check the state of each axis probe (x, y, z)
+        self.calibration_probe_inactive = any(endstop_states)
+        gcmd.respond_info("Calibration Probe: %s" % (["open", "TRIGGERED"][any(endstop_states)]))
+
+# ==============================================================================
+#                      PrinterProbeMultiAxis Class
+# ==============================================================================
 
 class PrinterProbeMultiAxis:
     def __init__(self, config, mcu_probe_x, mcu_probe_y, mcu_probe_z):
@@ -444,6 +471,9 @@ class PrinterProbeMultiAxis:
             return self._calc_median(positions, axis)
         return self._calc_mean(positions)
 
+# ==============================================================================
+#                       ProbeEndstopWrapper Class
+# ==============================================================================
 
 # Endstop wrapper that enables probe specific features
 class ProbeEndstopWrapper:
@@ -486,6 +516,9 @@ class ProbeEndstopWrapper:
     def get_position_endstop(self):
         return 0.
 
+# ==============================================================================
+#                          Module Hooks
+# ==============================================================================
 
 def load_config(config):
     return ToolsCalibrate(config)

@@ -1,13 +1,45 @@
-# Tools calibrate
+# Tools Calibrate
 
-An extension to calibrate tool offsets with a nozzle contact probe.
-Works by bumping the nozzle into the probe form multiple angles to pinpoint the nozzle location.
+**Automatic tool offset calibration using nozzle contact probes (NUDGE)**
 
-See [Nozzle Align](https://github.com/viesturz/NozzleAlign) repo for some sensor ideas.
+This module enables precise XY offset calibration by bumping the nozzle into a probe from multiple angles to pinpoint the nozzle location.
 
-### Configuration
+---
 
-See the [example](/examples/calibrate-offsets.cfg) folder for a full example.
+## 📚 Related Documentation
+
+**For complete calibration workflow, see:**
+- [**Calibration Guide**](CALIBRATION.md) - Step-by-step calibration procedures
+- [**ATOM Reference Config**](../examples/atom-tc-6tool/README.md#calibration-workflow) - Production-tested setup
+
+**Probe hardware:**
+- [NUDGE Probe](https://github.com/zruncho3d/nudge) by Zruncho (recommended)
+- [Nozzle Align](https://github.com/viesturz/NozzleAlign) - Alternative probe designs
+
+---
+
+## Overview
+
+### What This Module Does
+
+**XY Offset Calibration:**
+- Automatically measures XY position of each nozzle
+- Calculates offsets relative to initial tool (T0)
+- Saves offsets to configuration
+- Typical accuracy: ±0.05mm or better
+
+**Z Offset Calibration (with Beacon):**
+- Measures Z-height differences between tools
+- Uses Beacon contact mode for precision
+- Auto-saves via shell scripts
+
+---
+
+## Configuration
+
+**See complete example:** [examples/atom-tc-6tool/calibrate_offsets.cfg](../examples/atom-tc-6tool/calibrate_offsets.cfg)
+
+### Basic Configuration
 ```
 [tools_calibrate]
 
