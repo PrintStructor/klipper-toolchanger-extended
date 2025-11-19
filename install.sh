@@ -55,6 +55,57 @@ function restart_klipper {
   sudo systemctl restart klipper
 }
 
+function setup_moonraker_updater {
+  local moonraker_conf="${HOME}/printer_data/config/moonraker.conf"
+  
+  echo ""
+  echo "=========================================="
+  echo "Moonraker Update Manager Setup (Optional)"
+  echo "=========================================="
+  echo ""
+  echo "Would you like to add this extension to Moonraker's update manager?"
+  echo "This allows automatic updates via Mainsail/Fluidd web interface."
+  echo ""
+  read -p "Setup Moonraker updater? (y/N): " -n 1 -r
+  echo ""
+  
+  if [[ $REPLY =~ ^[Yy]$ ]]; then
+    if [ -f "${moonraker_conf}" ]; then
+      # Check if already configured
+      if grep -q "\[update_manager klipper-toolchanger-extended\]" "${moonraker_conf}"; then
+        echo "[MOONRAKER] Already configured in moonraker.conf, skipping..."
+      else
+        echo "[MOONRAKER] Adding update manager configuration..."
+        cat >> "${moonraker_conf}" << 'EOF'
+
+# ==============================================================================
+# Klipper Toolchanger Extended - Auto Update Configuration
+# ==============================================================================
+
+[update_manager klipper-toolchanger-extended]
+type: git_repo
+path: ~/klipper-toolchanger-extended
+origin: https://github.com/PrintStructor/klipper-toolchanger-extended.git
+primary_branch: main
+managed_services: klipper
+install_script: install.sh
+EOF
+        echo "[MOONRAKER] Configuration added successfully!"
+        echo "[MOONRAKER] Restarting Moonraker..."
+        sudo systemctl restart moonraker
+        echo "[MOONRAKER] Done! Check for updates in Mainsail/Fluidd interface."
+      fi
+    else
+      echo "[MOONRAKER] Warning: moonraker.conf not found at ${moonraker_conf}"
+      echo "[MOONRAKER] You can manually add the configuration later."
+      echo "[MOONRAKER] See moonraker.conf in this repository for details."
+    fi
+  else
+    echo "[MOONRAKER] Skipped. You can add it manually later if needed."
+    echo "[MOONRAKER] See moonraker.conf in this repository for configuration."
+  fi
+}
+
 printf "\n======================================\n"
 echo "- Klipper toolchanger-extended install script -"
 printf "======================================\n\n"
@@ -64,5 +115,14 @@ preflight_checks
 check_download
 link_extension
 restart_klipper
+setup_moonraker_updater
 
-echo "[DONE] Installation finished."
+echo ""
+echo "[DONE] Installation finished successfully!"
+echo ""
+echo "Next steps:"
+echo "  1. Add configuration to your printer.cfg"
+echo "  2. See examples/atom-tc-6tool/ for reference configuration"
+echo "  3. Customize for your specific hardware setup"
+echo "  4. Restart Klipper: sudo systemctl restart klipper"
+echo ""

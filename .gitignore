@@ -1,1 +1,277 @@
+# ==============================================================================
+# Klipper Toolchanger Extended - .gitignore
+# ==============================================================================
+
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+
+# ==============================================================================
+# Python
+# ==============================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# ==============================================================================
+# Klipper Specific
+# ==============================================================================
+
+# Klipper runtime files
+*.pyc
+klippy.log
+klippy.log.*
+
+# Klipper config backups
+printer-*.cfg
+*.cfg.bak
+*.cfg.old
+*.cfg.backup
+*.bak
+
+# Moonraker files
+moonraker.log
+moonraker.log.*
+database/
+
+# G-Code files (usually large)
+*.gcode
+*.gco
+*.g
+*.nc
+
+# Temporary files
+*.tmp
+*.temp
+
+# Klipper cache
+.klipper_cache/
+
+# ==============================================================================
+# CAD Files (Large Binary Files)
+# ==============================================================================
+
+# CAD software project files (optional - keep source files in repo)
+# Uncomment if you don't want to track these:
+# *.f3d
+# *.f3z
+# *.sldprt
+# *.sldasm
+# *.SLDPRT
+# *.SLDASM
+
+# CAD backups and temporary files
+*.bak
+*.old
+*~lock*
+*.tmp
+*.autosave
+~$*
+
+# CAD software cache
+.fusion360/
+.solidworks/
+
+# Render outputs (can be regenerated)
+*.png.bak
+*.jpg.bak
+renders/
+
+# ==============================================================================
+# 3D Printing Files
+# ==============================================================================
+
+# Slicer profiles (machine-specific)
+# Uncomment if you don't want to track these:
+# *.ini
+# *.3mf
+# *.bgcode
+
+# Temporary slicer files
+*.tmp.stl
+*.tmp.3mf
+
+# ==============================================================================
+# IDE and Editor Files
+# ==============================================================================
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+.*.sw?
+
+# Emacs
+\#*\#
+.\#*
+
+# Kate
+*.kate-swp
+
+# ==============================================================================
+# Version Control
+# ==============================================================================
+
+# Git
+.git/
+*.orig
+*.rej
+
+# ==============================================================================
+# Documentation Build Artifacts
+# ==============================================================================
+
+# Sphinx documentation
+docs/_build/
+docs/_static/
+docs/_templates/
+
+# MkDocs
+site/
+
+# ==============================================================================
+# Logs and Databases
+# ==============================================================================
+
+# Log files
+*.log
+*.log.*
+logs/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# ==============================================================================
+# Archive Files
+# ==============================================================================
+
+# Compressed archives (usually temporary)
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# ==============================================================================
+# Secrets and Configuration
+# ==============================================================================
+
+# Environment variables
+.env
+.env.local
+
+# SSH keys
+*.pem
+*.key
+id_rsa*
+
+# API keys / secrets
+secrets.yaml
+secrets.yml
+*_secrets.*
+
+# ==============================================================================
+# System and Runtime
+# ==============================================================================
+
+# Process IDs
+*.pid
+
+# Lock files
+*.lock
+
+# Node modules (if using any web tools)
+node_modules/
+
+# ==============================================================================
+# Project Specific
+# ==============================================================================
+
+# Personal printer configurations (users should copy examples)
+my_printer.cfg
+personal_*.cfg
+
+# Test files and scratch work
+test/
+scratch/
+experiments/
+
+# Local build artifacts
+*.o
+*.so
+*.dylib
+*.dll
+
+# Documentation drafts
+DRAFT_*.md
+TODO_*.md
