@@ -1,471 +1,285 @@
-# ⚡ Quick Start Guide
+# Quick Start Guide
 
-**Get your toolchanger running in under an hour!**
+This guide walks you from a **fresh clone** of `klipper-toolchanger-extended`
+to a **first safe, calibrated toolchange** on your printer.
 
----
+It focuses on the reference setup:
 
-## 📋 Prerequisites
+- VORON 2.4 350 mm
+- 6 × ATOM tools
+- Beacon probe
+- Tool‑presence sensing (recommended, but not strictly required)
 
-Before you begin, ensure you have:
-
-- ✅ **Klipper** installed and working
-- ✅ **VORON 2.4** or similar **CoreXY** printer
-- ✅ **CAN-Bus** setup (highly recommended) or USB connections
-- ✅ **At least 2 toolheads** mechanically installed
-- ✅ **Tool detection sensors** (filament sensors or microswitches)
-- ✅ **SSH access** to your Klipper host
-
-**⏱️ Estimated Time:** 45-60 minutes
+If you run different hardware, you can still follow the same steps and adapt
+positions and IDs to your machine.
 
 ---
 
-## 🚀 Step 1: Installation (5 minutes)
+## 1. Prerequisites
 
-### Clone the Repository
+Before you start, make sure you have:
+
+- ✅ A working Klipper install (v0.11+)
+- ✅ Basic single‑tool printing working on your machine
+- ✅ Homing and endstops configured correctly
+- ✅ A Z‑probe configured (Beacon recommended, but others work too)
+- ✅ Basic familiarity with:
+  - `printer.cfg`
+  - Using the Klipper console (Mainsail / Fluidd)
+  - Running `SAVE_CONFIG`
+
+**Strongly recommended:**
+
+- Tool‑presence / dock sensors (microswitch, hall sensor, etc.)
+- An emergency stop button within reach during first tests
+
+---
+
+## 2. Install the Fork
+
+SSH to your Klipper host and clone the repo:
 
 ```bash
 cd ~
 git clone https://github.com/PrintStructor/klipper-toolchanger-extended.git
+cd klipper-toolchanger-extended
 ```
 
-### Run the Installer
+Run the installation script:
 
 ```bash
-cd ~/klipper-toolchanger-extended
 ./install.sh
 ```
 
-**What this does:**
-- ✅ Installs Python modules to Klipper's extras directory
-- ✅ Configures Moonraker update manager
-- ✅ Creates symlinks for easy updates
+What this script does:
 
-### Restart Klipper
+- Symlinks the Python modules from this repo into your Klipper `extras/` folder
+- Optionally sets up a Moonraker `update_manager` entry
+- Restarts Klipper so the new modules are loaded
 
-```bash
-sudo systemctl restart klipper
-```
-
-**Verify installation:**
-- Check Mainsail/Fluidd for errors
-- Look for "klipper ready" status
+If anything fails here, fix it **before** moving on.
 
 ---
 
-## 🔧 Step 2: Basic Configuration (20 minutes)
+## 3. Include the Example Configuration
 
-### 2.1 Add Core Includes to printer.cfg
-
-Open your `printer.cfg` and add at the top:
+Open your main `printer.cfg` and add the following includes:
 
 ```ini
-#####################################################################
-# Klipper Toolchanger Extended
-#####################################################################
-
 [include klipper-toolchanger-extended/examples/atom-tc-6tool/toolchanger.cfg]
 [include klipper-toolchanger-extended/examples/atom-tc-6tool/toolchanger_macros.cfg]
 [include klipper-toolchanger-extended/examples/atom-tc-6tool/macros.cfg]
-[include klipper-toolchanger-extended/examples/atom-tc-6tool/calibrate_offsets.cfg]
+# ... add tool configs T0-T5 ...
 
-# Add your tools (minimum 2)
-[include klipper-toolchanger-extended/examples/atom-tc-6tool/T0.cfg]
-[include klipper-toolchanger-extended/examples/atom-tc-6tool/T1.cfg]
-# [include klipper-toolchanger-extended/examples/atom-tc-6tool/T2.cfg]  # Add more as needed
-
-# Optional: Hardware integration
-[include klipper-toolchanger-extended/examples/atom-tc-6tool/beacon.cfg]  # If using Beacon
-# [include klipper-toolchanger-extended/examples/atom-tc-6tool/tc_led_effects.cfg]  # If using LEDs
+# Example tool config includes:
+# [include klipper-toolchanger-extended/examples/atom-tc-6tool/T0.cfg]
+# [include klipper-toolchanger-extended/examples/atom-tc-6tool/T1.cfg]
+# [include klipper-toolchanger-extended/examples/atom-tc-6tool/T2.cfg]
+# [include klipper-toolchanger-extended/examples/atom-tc-6tool/T3.cfg]
+# [include klipper-toolchanger-extended/examples/atom-tc-6tool/T4.cfg]
+# [include klipper-toolchanger-extended/examples/atom-tc-6tool/T5.cfg]
 ```
 
-### 2.2 Find Your CAN UUIDs
+Then **restart Klipper** from your web UI.
 
-For each toolhead with a CAN board:
-
-```bash
-~/klippy-env/bin/python ~/klipper/scripts/canbus_query.py can0
-```
-
-**Example output:**
-```
-Found canbus_uuid=abc123def456, Application: Klipper
-Found canbus_uuid=789ghi012jkl, Application: Klipper
-```
-
-### 2.3 Configure Each Tool
-
-**Copy the example configs to your config directory:**
-
-```bash
-mkdir -p ~/printer_data/config/toolchanger
-cp ~/klipper-toolchanger-extended/examples/atom-tc-6tool/*.cfg ~/printer_data/config/toolchanger/
-```
-
-**Edit each tool file (T0.cfg, T1.cfg, etc.):**
-
-Open `T0.cfg` and update:
-
-```ini
-[mcu T0]
-canbus_uuid: abc123def456  # ← YOUR UUID HERE!
-
-[tool T0]
-tool_number: 0
-params_park_x: 25.3        # ← YOUR DOCK POSITION
-params_park_y: 3.0         # ← YOUR DOCK POSITION
-params_park_z: 325.0       # ← YOUR DOCK HEIGHT
-```
-
-**⚠️ CRITICAL:** Measure your dock positions accurately!
-- Use `GET_POSITION` to record current XYZ
-- Park each toolhead manually over its dock
-- Write down the coordinates
-
-**Repeat for T1, T2, etc.**
-
-### 2.4 Configure Safe Positions
-
-Edit `toolchanger.cfg`:
-
-```ini
-[toolchanger]
-params_safe_y: 105        # ← Safe Y for horizontal moves (clear of docks)
-params_close_y: 35        # ← Y position close to dock area
-```
-
-**How to determine:**
-- `params_safe_y`: Y position where toolhead can move X freely without hitting docks
-- `params_close_y`: Y position just in front of docks
-
-### 2.5 Save and Restart
-
-```gcode
-SAVE_CONFIG
-RESTART
-```
+If there are syntax errors, fix them now (wrong paths, typos, etc.) before continuing.
 
 ---
 
-## 🎯 Step 3: First Initialization (10 minutes)
+## 4. Wire Up Your Hardware in Config
 
-### 3.1 Home Your Printer
+At this point, the example config is included – but it still contains
+**placeholder values** for *your* hardware.
 
-```gcode
-G28
-```
+Go through the following **in order**:
 
-**Verify:** All axes home successfully without errors.
+### 4.1. MCU / Board IDs
 
-### 3.2 Set Initial Tool
+In each `T*.cfg` and related files, update:
 
-```gcode
-SET_INITIAL_TOOL TOOL=0
-```
+- `mcu` / `canbus_uuid` for each toolhead board
+- Any `[extruder]`, `[heater_fan]`, `[fan]` sections to match your pins
 
-**What this does:**
-- Sets T0 as the reference tool (XY offsets = 0, 0)
-- All other tools will be calibrated relative to T0
-- This is your "master" tool
+If you are unsure, start from the configs that already work for your
+single‑tool setup and merge them into the ATOM tool configs.
 
-### 3.3 Test Tool Detection
+### 4.2. Beacon / Z‑Probe
 
-For each tool, verify detection works:
+Make sure your Z‑probe section (Beacon or other) is correct and working:
 
-```gcode
-QUERY_FILAMENT_SENSOR SENSOR=T0_filament_sensor
-QUERY_FILAMENT_SENSOR SENSOR=T1_filament_sensor
-```
+- Probe pin and communication
+- Offsets (X, Y) relative to the nozzle
+- Basic Z offset procedure already validated on a single‑tool setup
 
-**Expected output:**
-- With tool present: `filament_detected: True`
-- Without tool: `filament_detected: False`
+You **must** have a known‑good Z‑probe before running automated Z calibration.
 
-**🚨 Troubleshooting:**
-- If inverted, add `!` to pin in TX.cfg: `switch_pin: !PG12`
-- Check wiring and sensor functionality
+### 4.3. Dock Positions (Coarse)
 
-### 3.4 Test First Tool Change
+The ATOM example provides dock positions that work on the reference VORON build.
 
-**Manually position toolhead near T0 dock:**
+On your printer:
 
-```gcode
-G0 X25 Y10 Z330 F3000  # Adjust to your dock area
-```
+- Roughly position your docks where the reference expects them
+- Adjust X/Y positions in `T0.cfg … T5.cfg` so:
+  - The nozzle passes near the center of each dock
+  - There is no risk of crashing into frame parts
 
-**Test dock/undock:**
-
-```gcode
-TEST_TOOL_DOCKING
-```
-
-**What happens:**
-1. Tool drops off at dock
-2. Returns to safe position
-3. Picks up tool again
-4. Returns to start position
-
-**🚨 If this fails:**
-- Check dock positions are correct
-- Verify path in toolchanger.cfg matches your hardware
-- Manually jog through dock path to verify clearances
+You do **not** need perfect values yet – just "close enough" that the
+NUDGE‑based calibration can safely refine them.
 
 ---
 
-## 📐 Step 4: Calibration (30 minutes)
+## 5. Sanity Checks (No Tools Yet)
 
-### 4.1 Prepare NUDGE Probe
+Before attempting a real tool change:
 
-**Position the probe:**
-- Place NUDGE probe on bed in accessible location
-- Note approximate X, Y coordinates
+1. Home all axes:
 
-**Update in `calibrate_offsets.cfg`:**
+   ```gcode
+   G28
+   ```
 
-```ini
-[gcode_macro NUDGE_MOVE_OVER_PROBE]
-gcode:
-    G0 X150 Y150 Z10 F6000  # ← YOUR PROBE POSITION
-```
+2. Move manually to positions roughly above each dock to confirm:
+   - No collisions with frame/wiring
+   - Axes can reach needed positions
 
-**Test positioning:**
+3. Keep speeds conservative at first:
 
-```gcode
-G28
-SET_INITIAL_TOOL TOOL=0
-T0
-NUDGE_MOVE_OVER_PROBE
-```
+   ```gcode
+   SET_VELOCITY_LIMIT VELOCITY=100 ACCEL=1500
+   ```
 
-**Verify:** Nozzle should be roughly above probe center (±2mm is fine).
+---
 
-### 4.2 Calibrate XY Offsets
+## 6. First Toolchange Test (Dry Run)
 
-**Ensure nozzles are clean!** Calibration accuracy depends on clean nozzles.
+With **no filament loaded** and bed relatively cool:
 
-```gcode
-NUDGE_FIND_TOOL_OFFSETS INITIAL_TOOL=0
-```
+1. Set the initial tool:
 
-**What happens:**
-1. T0 locates probe center (establishes reference)
-2. Switches to T1, finds probe center
-3. Calculates XY offset between T0 and T1
-4. Repeats for all configured tools
-5. Prompts to save config
+   ```gcode
+   SET_INITIAL_TOOL TOOL=0
+   ```
 
-**Expected output example:**
-```
-T0: XY offset = 0.000, 0.000 (reference tool)
-T1: XY offset = -0.022, 0.091
-T2: XY offset = 0.015, -0.033
-```
+2. Pick up T0 using your configured macro (typically `T0` or a specific pickup macro):
 
-**Save the results:**
+   ```gcode
+   T0
+   ```
+
+3. Drop T0 again (e.g. `T-1` or dedicated park/drop macro, depending on your setup).
+
+4. Repeat for each tool (T1…T5), watching:
+   - Motion path
+   - Dock engagement
+   - Any scraping / collisions
+
+Do **not** continue until you are confident all tools can be picked and dropped
+without mechanical issues.
+
+---
+
+## 7. XY Calibration with `NUDGE_FIND_TOOL_OFFSETS`
+
+Once basic pickup and dropoff work:
+
+1. Home:
+
+   ```gcode
+   G28
+   ```
+
+2. Set your **reference tool** (usually T0):
+
+   ```gcode
+   SET_INITIAL_TOOL TOOL=0
+   ```
+
+3. Run the XY calibration helper:
+
+   ```gcode
+   NUDGE_FIND_TOOL_OFFSETS INITIAL_TOOL=0
+   ```
+
+This macro will guide you through aligning the tools in XY relative to your
+reference tool. Follow the on‑screen / console instructions carefully.
+
+When you are satisfied with the alignment, run:
 
 ```gcode
 SAVE_CONFIG
 ```
 
-### 4.3 Calibrate Z Offsets
+Klipper will write the computed offsets to your config file.
 
-**Using Beacon probe:**
+> 📌 Full details in: `CALIBRATION.md` → *XY Calibration*
 
-```gcode
-MEASURE_TOOL_Z_OFFSETS INITIAL_TOOL=0
-```
+---
 
-**What happens:**
-1. T0 performs Beacon contact (establishes Z reference)
-2. Switches to T1, performs Beacon contact
-3. Calculates Z offset difference
-4. Repeats for all tools
-5. Auto-saves to config files via shell script
+## 8. Z Calibration with `MEASURE_TOOL_Z_OFFSETS`
 
-**Expected output example:**
-```
-T0: Z offset = 0.00000 (reference tool)
-T1: Z offset = -0.10512
-T2: Z offset = 0.05234
-```
+After XY is dialed in:
 
-### 4.4 Tune Global Z-Offset
+1. Home & heat the bed and tools to your usual print temperatures.
 
-The global Z-offset fine-tunes first layer height for the initial tool.
+2. Make sure your reference tool T0 has a correct Z offset via your normal
+   probe‑based procedure.
 
-**Run a first layer test print with T0:**
+3. Run:
 
-```gcode
-G28
-BED_MESH_CALIBRATE
-T0
-G0 X100 Y100 Z0.2 F3000
-# Print a small square or line
-```
+   ```gcode
+   G28
+   SET_INITIAL_TOOL TOOL=0
+   MEASURE_TOOL_Z_OFFSETS INITIAL_TOOL=0
+   ```
 
-**Adjust based on first layer:**
-- Too squished → increase value: `0.08` → `0.10`
-- Too high → decrease value: `0.08` → `0.06`
+The macro will use your probe to measure each tool and compute its Z offset
+relative to the reference.
 
-**Set the value:**
+When it finishes, run:
 
 ```gcode
-SET_GCODE_VARIABLE MACRO=globals VARIABLE=global_z_offset VALUE=0.08
 SAVE_CONFIG
 ```
 
-**Typical range:** 0.06 - 0.12mm
+> 📌 Full details in: `CALIBRATION.md` → *Z Calibration*
 
 ---
 
-## 🖨️ Step 5: First Multi-Tool Print (10 minutes)
+## 9. First Real Test Print
 
-### 5.1 Configure OrcaSlicer
+Now you have:
 
-See the detailed [OrcaSlicer Setup Guide](../examples/atom-tc-6tool/ORCASLICER_SETUP.md).
+- ✅ Safe, working pickup & dropoff
+- ✅ XY offsets calibrated
+- ✅ Z offsets calibrated
 
-**Quick setup:**
+Pick a **small** multi‑tool test:
 
-1. **Machine Start G-code:**
-   ```gcode
-   PRINT_START BED_TEMP=[first_layer_bed_temperature] TOOL_TEMP={first_layer_temperature[initial_tool]} INITIAL_TOOL=[initial_tool]
-   ```
+- 2–3 colors
+- Simple shapes
+- 5–20 minutes print time
 
-2. **Machine End G-code:**
-   ```gcode
-   PRINT_END
-   ```
+Make sure your slicer calls your standard print‑start macro and uses
+tool change commands (`T0`, `T1`, …) that match your config.
 
-3. **Change Filament G-code:**
-   ```gcode
-   M104 S{temperature[next_extruder]} T[next_extruder]
-   ```
+Watch this print in full. If everything looks good:
 
-### 5.2 Slice a Test Object
-
-**Recommendations:**
-- Start simple: 2 tools, 2 colors
-- Small object (< 50mm)
-- Low layer count (< 30 layers)
-- Moderate tool changes (< 20 changes)
-
-**Test models:**
-- Calibration cube with logo in different color
-- Multi-color spiral vase
-- Simple 2-part assembly
-
-### 5.3 Start the Print
-
-```gcode
-PRINT_START BED_TEMP=110 TOOL_TEMP=240 INITIAL_TOOL=0
-```
-
-**Monitor the first few layers:**
-- Tool changes complete successfully
-- No crashes or detection errors
-- Layers adhere properly
-- Offsets look correct
-
-### 5.4 Success! 🎉
-
-**Congratulations!** You now have a working multi-tool 3D printer.
-
-**Share your success:**
-- Post pictures in discussions
-- Report any issues found
-- Contribute improvements
+- Gradually increase complexity
+- Increase speed/accel
+- Start trusting the system with longer jobs
 
 ---
 
-## ✅ Quick Start Checklist
+## 10. Where to Go Next
 
-Use this checklist to track your progress:
+- Read **`WHY_THIS_FORK.md`** for background and design philosophy  
+- Check **`FEATURE_COMPARISON.md`** to see how this fork differs from others  
+- Study **`CALIBRATION.md`** for deeper understanding of XY/Z workflows  
+- Explore **`examples/atom-tc-6tool/README.md`** for the full reference setup
 
-- [ ] **Installation**
-  - [ ] Repository cloned
-  - [ ] install.sh executed
-  - [ ] Klipper restarted without errors
+Once you’re comfortable, you can start:
 
-- [ ] **Configuration**
-  - [ ] Core configs included in printer.cfg
-  - [ ] CAN UUIDs found and entered
-  - [ ] Dock positions measured and configured
-  - [ ] Safe Y positions configured
-  - [ ] Config saved and Klipper restarted
-
-- [ ] **Initialization**
-  - [ ] Printer homed successfully
-  - [ ] Initial tool set (T0)
-  - [ ] Tool detection verified for all tools
-  - [ ] TEST_TOOL_DOCKING successful
-
-- [ ] **Calibration**
-  - [ ] NUDGE probe positioned
-  - [ ] XY offsets calibrated and saved
-  - [ ] Z offsets calibrated and saved
-  - [ ] Global Z-offset tuned for first layer
-
-- [ ] **First Print**
-  - [ ] OrcaSlicer configured
-  - [ ] Test object sliced
-  - [ ] Print completed successfully
-
----
-
-## 🆘 Quick Troubleshooting
-
-### "Toolchanger not initialized"
-**Solution:** Run `INITIALIZE_TOOLCHANGER` or `SET_INITIAL_TOOL TOOL=0`
-
-### Tool detection fails
-**Solution:** 
-- Check sensor with `QUERY_FILAMENT_SENSOR`
-- Verify wiring and pin configuration
-- Try inverting pin: `switch_pin: !PG12`
-
-### Tool gets stuck during pickup
-**Solution:**
-- Verify dock positions are correct
-- Reduce path speed: `params_path_speed: 300`
-- Manually test path motions
-
-### XY offsets seem wrong
-**Solution:**
-- Ensure initial tool was set before calibration
-- Clean nozzles thoroughly
-- Re-run `NUDGE_FIND_TOOL_OFFSETS`
-
-### First layer height inconsistent between tools
-**Solution:**
-- Re-calibrate Z offsets
-- Check Beacon probe calibration
-- Adjust global_z_offset
-
----
-
-## 📚 Next Steps
-
-Now that your toolchanger is running, explore these guides:
-
-### For Configuration
-- [**Configuration Guide**](CONFIGURATION.md) - Detailed parameter reference
-- [**Calibration Guide**](CALIBRATION.md) - Advanced calibration techniques
-
-### For Troubleshooting
-- [**Troubleshooting Guide**](TROUBLESHOOTING.md) - Comprehensive problem solving
-- [**FAQ**](FAQ.md) - Common questions answered
-
-### For Advanced Features
-- [Tool Probe System](tool_probe.md) - Configure custom probes
-- [Rounded Path](rounded_path.md) - Smooth motion paths
-- [LED Effects](../examples/atom-tc-6tool/tc_led_effects.cfg) - Visual feedback
-
-### Community
-- [GitHub Discussions](https://github.com/PrintStructor/klipper-toolchanger-extended/discussions)
-- [Report Issues](https://github.com/PrintStructor/klipper-toolchanger-extended/issues)
-- [Contribute](../CONTRIBUTING.md)
-
----
-
-**Version:** 1.0.0  
-**Last Updated:** 2025-11-18  
-**License:** GPL-3.0
+- Tuning per‑tool input shaper
+- Integrating KNOMI / LED status
+- Refining your slicer profiles for multi‑tool printing
