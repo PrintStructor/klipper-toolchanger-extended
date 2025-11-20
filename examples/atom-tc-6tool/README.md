@@ -6,25 +6,73 @@
 
 ---
 
-## 🎯 What Makes This Configuration Special
+## ⚠️ CRITICAL: This is a Real-World Working Configuration
 
-This is a **complete, production-tested** configuration for multi-tool 3D printing with advanced safety features:
+**READ THIS BEFORE USING:**
 
-### 🛡️ **Unique Safety Features**
-- **Two-Stage Tool Pickup** - Verifies tool presence before completing pickup, preventing crashes
-- **Non-Fatal Error Handling** - Pauses print instead of emergency stop, allowing recovery
-- **Continuous Tool Monitoring** - Detects if tool drops mid-print and safely pauses
-- **Smart Recovery System** - Automatically restores position and temperature after errors
+This configuration contains **MY actual machine values** - including:
+- ✋ **CAN UUIDs** - Unique to my EBB boards
+- 📐 **Dock positions** - Specific to my physical dock locations  
+- 🎯 **Calibrated offsets** - XY/Z offsets tuned for my machine
+- 🔧 **Input shaper values** - Resonance frequencies for my frame
+- 🌡️ **PID values** - Temperature control tuned for my hotends
 
-### 🚀 **Advanced Capabilities**
+**YOU MUST CHANGE THESE VALUES FOR YOUR MACHINE!**
+
+### What You MUST Update:
+
+1. **CAN UUIDs** (in every T0-T5.cfg):
+   ```ini
+   [mcu et0]
+   canbus_uuid: XXXXXXXX  # ← Replace with YOUR board's UUID
+   ```
+   Find yours with: `~/klippy-env/bin/python ~/klipper/scripts/canbus_query.py can0`
+
+2. **Dock Positions** (in every T0-T5.cfg):
+   ```ini
+   params_park_x: 25.3    # ← Your dock X position
+   params_park_y: 3.0     # ← Your dock Y position  
+   params_park_z: 325.0   # ← Safe Z height for your machine
+   ```
+
+3. **Calibrate ALL Offsets** (don't use my values):
+   ```gcode
+   NUDGE_FIND_TOOL_OFFSETS INITIAL_TOOL=0  # XY offsets
+   MEASURE_TOOL_Z_OFFSETS INITIAL_TOOL=0   # Z offsets
+   SAVE_CONFIG
+   ```
+
+4. **Run PID Tuning** (per tool):
+   ```gcode
+   PID_CALIBRATE HEATER=extruder TARGET=260
+   PID_CALIBRATE HEATER=extruder1 TARGET=260
+   # ... etc for all tools
+   ```
+
+**This is a REFERENCE showing what a complete, working config looks like.**  
+**Treat it as a template - adjust everything to match YOUR hardware!**
+
+---
+
+## Configuration Overview
+
+This is a complete reference configuration for 6-tool VORON printers using ATOM toolheads.
+
+### Safety Features
+- **Two-Stage Tool Pickup** - Verifies tool presence before completing pickup
+- **Error Recovery** - Pauses print instead of emergency stop when recoverable errors occur
+- **Tool Presence Monitoring** - Detects tool loss during printing and pauses safely
+- **Position Restoration** - Automatically restores print position and temperature after recovery
+
+### Key Capabilities
 - **Per-Tool Input Shaper** - Individual resonance compensation for each toolhead
-- **Automatic Offset Calibration** - NUDGE probe for XY, Beacon contact for Z
-- **Rounded Motion Paths** - Smooth curved movements reduce mechanical stress
+- **Automated Calibration** - NUDGE probe for XY offsets, Beacon contact for Z offsets
+- **Rounded Motion Paths** - Smooth curved movements for reduced mechanical stress
 - **LED Status Visualization** - Real-time feedback via chamber and tool LEDs
-- **KNOMI Display Integration** - Smart sleep/wake for BTT round displays
+- **KNOMI Display Integration** - Smart sleep/wake control for BTT displays
 
-### 🎨 **Hardware Integration**
-Built for the **ATOM toolhead system** - an exclusive design by the creator of the Reaper Toolhead, specifically developed for this toolchanger project.
+### Hardware Design
+This configuration is built for ATOM toolheads (custom-designed by Alex at APDMachine, creator of the Reaper Toolhead) integrated with VORON 2.4 printers.
 
 ---
 
@@ -512,7 +560,7 @@ DEBUG_TOOL_DETECTION            # Display detection status
 ## Credits
 
 **ATOM Toolhead System:**  
-Exclusive design by the creator of the **Reaper Toolhead**, specifically developed for this toolchanger project.
+Custom-designed by Alex at APDMachine (creator of the Reaper Toolhead) for this toolchanger project.
 
 **Base Toolchanger Framework:**  
 [viesturz/klipper-toolchanger](https://github.com/viesturz/klipper-toolchanger) by Viesturs Zarins
@@ -526,5 +574,5 @@ PrintStructor - [github.com/PrintStructor](https://github.com/PrintStructor)
 ---
 
 **Version:** 1.0.0  
-**Last Updated:** 2025-11-18  
+**Last Updated:** 2025-11-20  
 **License:** GPL-3.0

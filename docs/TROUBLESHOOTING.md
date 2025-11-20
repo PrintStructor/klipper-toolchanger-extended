@@ -1,954 +1,470 @@
-# 🚨 Troubleshooting Guide
+# Troubleshooting
 
-**Comprehensive problem diagnosis and solutions**
+This document collects common problems when setting up and running
+`klipper-toolchanger-extended` and how to diagnose / fix them.
 
----
+It is organized roughly in the order you will hit issues:
 
-## 📋 Table of Contents
+1. Klipper fails to start
+2. Tools / boards won’t connect
+3. Tool pickup / dropoff problems
+4. Tool presence / sensors
+5. Calibration macros failing
+6. Print / recovery issues
+7. Slicer & workflow quirks
 
-1. [Diagnosis Flowchart](#diagnosis-flowchart)
-2. [By Symptom](#by-symptom)
-3. [By Component](#by-component)
-4. [Error Messages](#error-messages)
-5. [Log Analysis](#log-analysis)
-6. [Getting Support](#getting-support)
-
----
-
-## Diagnosis Flowchart
-
-```
-[Problem Occurred]
-       ↓
-Does Klipper start?
-  NO → See: Klipper Won't Start
-  YES → Continue
-       ↓
-Is toolchanger initialized?
-  NO → See: Toolchanger Not Initialized
-  YES → Continue
-       ↓
-Does tool detection work?
-  NO → See: Tool Detection Issues
-  YES → Continue
-       ↓
-Do tool changes complete?
-  NO → See: Tool Change Failures
-  YES → Continue
-       ↓
-Are offsets correct?
-  NO → See: Offset Problems
-  YES → System Working!
-```
+Always keep an eye on **`klippy.log`** – it is your best friend when
+things go wrong.
 
 ---
 
-## By Symptom
+## 1. Klipper Fails to Start
 
-### 🔴 Klipper Won't Start
-
-#### Symptom
-- Mainsail/Fluidd shows "Klipper not connected"
-- Red "Disconnected" status
-- No response to commands
-
-#### Common Causes
-
-**1. Python Module Import Errors**
-
-Check log:
-```bash
-tail -50 ~/printer_data/logs/klippy.log | grep -i error
-```
-
-**Solution:**
-```bash
-# Re-run installation
-cd ~/klipper-toolchanger-extended
-./install.sh
-sudo systemctl restart klipper
-```
-
-**2. Configuration Syntax Errors**
-
-**Symptoms in log:**
-```
-Option 'invalid_param' is not valid in section 'toolchanger'
-```
-
-**Solution:**
-- Review recent config changes
-- Comment out suspicious sections
-- Restart Klipper after each change
-- Check spelling of parameter names
-
-**3. Missing Include Files**
+### 1.1. “Error loading module 'toolchanger_extended'”
 
 **Symptoms:**
-```
-Unable to open config file '/path/to/file.cfg'
-```
 
-**Solution:**
-- Verify file path is correct
-- Check file exists: `ls -la /path/to/file.cfg`
-- Fix path or create missing file
+- Klipper refuses to start
+- Log shows something like:
+  - `Error loading module 'toolchanger_extended'`
+  - Python import errors
 
----
+**Possible causes & fixes:**
 
-### 🟠 Toolchanger Not Initialized
+- The repo was not installed correctly:
+  - Re-run:
 
-#### Symptom
-- Error: "Toolchanger not initialized"
-- `T0`, `T1` commands not available
-- `QUERY_TOOLCHANGER` shows "uninitialized"
+    ```bash
+    cd ~/klipper-toolchanger-extended
+    ./install.sh
+    ```
 
-#### Diagnosis
+  - Make sure the script completes without errors.
 
-```gcode
-QUERY_TOOLCHANGER
-```
+- You updated Klipper but not this repo:
+  - `git pull` in `klipper-toolchanger-extended`
+  - Re-run `./install.sh`
+  - Restart Klipper
 
-**Expected output:**
-```
-toolchanger status: ready
-tool: T0
-tool_number: 0
-```
-
-**If shows "uninitialized":**
-
-#### Solutions
-
-**1. Manual Initialization**
-
-```gcode
-SET_INITIAL_TOOL TOOL=0
-```
-
-**2. Check Initialization Settings**
-
-```ini
-[toolchanger]
-initialize_on: first-use    # or 'home' or 'manual'
-```
-
-**3. Verify Tools Are Configured**
-
-```gcode
-# Should show multiple tools
-QUERY_TOOLCHANGER
-```
-
-If only 1 tool shown, check:
-- At least 2 tool configs included
-- Tool numbers are unique
-- No syntax errors in tool configs
+- Wrong `extra` module path:
+  - Check your `klippy.log` for where Klipper expects extras
+  - Verify that the symlink created by `install.sh` points there
 
 ---
 
-### 🟡 Tool Detection Issues
-
-#### Symptom
-- "Tool not detected" errors
-- Tool pickup fails verification
-- Detection sensor not responding
-
-#### Diagnosis Steps
-
-**Step 1: Query Sensor Directly**
-
-```gcode
-QUERY_FILAMENT_SENSOR SENSOR=T0_filament_sensor
-```
-
-**Expected:**
-- With tool: `filament_detected: True`
-- Without tool: `filament_detected: False`
-
-**Step 2: If Inverted (opposite of expected)**
-
-**Solution:**
-```ini
-# In TX.cfg, toggle pin inversion
-detection_pin: !T0:PG11    # Add ! if missing
-# or
-detection_pin: T0:PG11     # Remove ! if present
-```
-
-**Step 3: If No Response / Always Same**
-
-**Check wiring:**
-- Continuity test with multimeter
-- Verify pin number in config matches board
-- Check crimps and connectors
-
-**Check pin configuration:**
-```ini
-detection_pin: ^T0:PG11    # ^ = pullup
-detection_pin: !T0:PG11    # ! = inverted
-detection_pin: ^!T0:PG11   # Both
-```
-
-**Test manually:**
-```bash
-# Monitor pin state in real-time
-# In Klipper console, watch:
-QUERY_FILAMENT_SENSOR SENSOR=T0_filament_sensor
-# Manually trigger sensor, observe changes
-```
-
----
-
-### 🔵 Tool Change Failures
-
-#### Symptom
-- Tool gets stuck during pickup/dropoff
-- Crashes into dock or other objects
-- "Tool change aborted" errors
-
-#### Diagnosis by Stage
-
-**Stage 1: Before Movement**
-
-**Error:** "Axis not homed"
-
-**Solution:**
-```gcode
-G28    # Home all axes
-```
-
-Or set auto-home:
-```ini
-[toolchanger]
-on_axis_not_homed: home
-```
-
----
-
-**Stage 2: During Dropoff**
-
-**Error:** Tool doesn't release properly
-
-**Causes:**
-- Incorrect dock position
-- Path issues
-- Mechanical binding
-
-**Solution:**
-1. **Verify dock position:**
-   ```gcode
-   # Manually jog to dock
-   G0 X{park_x} Y{park_y} Z{park_z} F1000
-   # Should be perfectly aligned
-   ```
-
-2. **Reduce speed for testing:**
-   ```ini
-   params_path_speed: 300    # Very slow (5mm/s)
-   ```
-
-3. **Check path definition:**
-   ```python
-   # In toolchanger.cfg
-   # Example: ATOM 4-point path
-   [{'y':9, 'z':1},           # Approach
-    {'y':8, 'z':0.5, 'f':0.5}, # Verify point
-    {'y':0, 'z':0.5},         # Insert
-    {'y':0, 'z':-10}]         # Lock
-   ```
-
----
-
-**Stage 3: During Pickup**
-
-**Error:** "Probe triggered prior to movement"
-
-**Meaning:** Tool detection triggered before pickup started
-
-**Causes:**
-1. Tool sensor not actually empty (tool stuck)
-2. Sensor wiring short
-3. Pin configuration inverted
-
-**Solution:**
-```gcode
-# 1. Verify sensor reads False without tool
-QUERY_FILAMENT_SENSOR SENSOR=T0_filament_sensor
-
-# 2. If reads True when empty, invert pin
-# In TX.cfg:
-detection_pin: !T0:PG11    # Add !
-
-# 3. Check for mechanical issues
-# Manually remove tool completely
-# Clean dock area
-```
-
----
-
-**Error:** "Tool not detected after pickup"
-
-**Meaning:** Verification failed (Two-Stage Pickup)
-
-**Causes:**
-1. Tool not fully inserted
-2. Sensor not triggering
-3. Path doesn't reach verification point
-
-**Solution:**
-
-1. **Check path has verification point:**
-   ```python
-   {'y':8, 'z':0.5, 'f':0.5}  # The 'f':0.5 marks verification
-   ```
-
-2. **Test sensor at verification position:**
-   ```gcode
-   # Move to verification position manually
-   G0 X{park_x} Y8 Z{park_z+0.5}
-   QUERY_FILAMENT_SENSOR SENSOR=T0_filament_sensor
-   # Should read True
-   ```
-
-3. **Adjust verification position:**
-   - Move 'f' earlier if triggering late
-   - Move 'f' later if triggering early
-
----
-
-### 🟢 Offset Problems
-
-#### Symptom
-- Tools print at wrong XY positions
-- Z-height inconsistent between tools
-- Layer shifts when switching tools
-
-#### XY Offset Issues
-
-**Diagnosis:**
-
-```gcode
-# Print a test object with multiple tools
-# Check if features align properly
-```
-
-**Causes:**
-
-**1. Initial tool not set**
-
-**Solution:**
-```gcode
-SET_INITIAL_TOOL TOOL=0
-# Must run before calibration and before each print
-```
-
-**2. Offsets not calibrated**
-
-**Solution:**
-```gcode
-NUDGE_FIND_TOOL_OFFSETS INITIAL_TOOL=0
-SAVE_CONFIG
-```
-
-**3. Offsets drifting over time**
-
-**Causes:**
-- Mechanical loosening (check bolts)
-- Dock position changed
-- Probe moved
-
-**Solution:**
-- Tighten all mechanical connections
-- Re-calibrate: `NUDGE_FIND_TOOL_OFFSETS`
-- Run weekly offset verification
-
-**4. Nozzles not clean during calibration**
-
-**Effect:** Offsets contain errors from debris
-
-**Solution:**
-- Clean all nozzles thoroughly
-- Heat and wipe with brass brush
-- Re-calibrate with clean nozzles
-
----
-
-#### Z-Offset Issues
-
-**Diagnosis:**
-
-```gcode
-# Print first layer with different tools
-# Check if height varies between tools
-```
+### 1.2. “Error parsing config” / “Unknown section”
 
 **Symptoms:**
-- First layer too high with some tools
-- First layer too low with others
-- Inconsistent squish
 
-**Solutions:**
+- Web UI shows config error
+- Log mentions:
+  - `Unknown section [toolchanger]`
+  - `Unknown command 'SET_TOOL'`
+  - Similar
 
-**1. Re-calibrate Z-offsets**
+**Possible causes & fixes:**
 
-```gcode
-MEASURE_TOOL_Z_OFFSETS INITIAL_TOOL=0
-```
+- You included `toolchanger_macros.cfg` / `T*.cfg` but not `toolchanger.cfg`:
+  - Make sure you have:
 
-**2. Check Beacon probe calibration**
+    ```ini
+    [include klipper-toolchanger-extended/examples/atom-tc-6tool/toolchanger.cfg]
+    ```
 
-```gcode
-BEACON_CALIBRATE
-```
+- Typo in `[include ...]` path:
+  - Check path spelling carefully
+  - Use the full relative path from your `printer.cfg` location
 
-**3. Adjust global Z-offset**
-
-```gcode
-# Fine-tune first layer height for initial tool
-SET_GCODE_VARIABLE MACRO=globals VARIABLE=global_z_offset VALUE=0.08
-SAVE_CONFIG
-```
-
-**Typical values:** 0.06 - 0.12mm
-
-**4. Verify bed mesh is current**
-
-```gcode
-BED_MESH_CALIBRATE
-# Or for adaptive:
-BED_MESH_CALIBRATE ADAPTIVE=1
-```
+- Old cached config:
+  - Restart Klipper from UI
+  - If needed, restart the Klipper service on the host
 
 ---
 
-### 🟣 CAN-Bus Problems
+## 2. Tools / Boards Won’t Connect
 
-#### Symptom
-- Tools not found
-- "MCU connection timeout"
-- Intermittent disconnections
+### 2.1. MCU Not Found / Timeout
 
-#### Diagnosis
+**Symptoms:**
 
-**1. Query CAN-bus:**
+- Log shows:
+  - `MCU 'tool0' shutdown`
+  - `Timeout trying to connect to MCU 'tool0'`
+- Temperature reads as `0.0` or `error`
 
-```bash
-~/klippy-env/bin/python ~/klipper/scripts/canbus_query.py can0
-```
+**Possible causes & fixes:**
 
-**Expected:** Shows all tool MCUs
+- Wrong `canbus_uuid` / `serial`:
+  - Run `ls /dev/serial/by-id/` (for USB)
+  - Use `canbus_query.py` (for CAN)
+  - Update each `[mcu toolX]` section in `T*.cfg` accordingly
 
-**2. Check CAN interface:**
+- Incorrect USB permissions:
+  - Compare with your working main MCU
+  - Ensure user running Klipper has access to the device
 
-```bash
-ip link show can0
-```
-
-**Expected:** Shows "UP" state
-
-**If down:**
-```bash
-sudo ip link set can0 up type can bitrate 500000
-```
-
-#### Common Issues
-
-**1. Wrong UUID in config**
-
-**Symptom:** MCU not found after UUID changes
-
-**Solution:**
-```bash
-# Find current UUIDs
-~/klippy-env/bin/python ~/klipper/scripts/canbus_query.py can0
-
-# Update in TX.cfg
-[mcu TX]
-canbus_uuid: YOUR_NEW_UUID_HERE
-```
-
-**2. CAN termination resistor**
-
-**Symptom:** Unreliable communication, random disconnects
-
-**Solution:**
-- Verify 120Ω termination at both ends of CAN bus
-- Use multimeter to check resistance between CANH and CANL
-- Should read ~60Ω with bus powered off
-
-**3. CAN bus too long**
-
-**Symptom:** Errors increase with distance
-
-**Solution:**
-- Keep CAN runs under 5 meters for 500kbps
-- Use twisted pair cable
-- Reduce bitrate if longer runs needed:
-  ```bash
-  sudo ip link set can0 type can bitrate 250000
-  ```
-
-**4. Electrical noise**
-
-**Symptom:** Random errors, especially during heater cycles
-
-**Solution:**
-- Route CAN cables away from heater wires
-- Add ferrite beads to CAN cable
-- Ensure proper grounding
+- Board not powered:
+  - Check 24V / 12V / 5V supply
+  - Verify LEDs on the toolhead boards
 
 ---
 
-### 🔴 LED Effects Not Working
+### 2.2. Temperature / Heater Errors
 
-#### Symptom
-- LEDs stay off
-- Wrong colors displayed
-- Effects don't change
+**Symptoms:**
 
-#### Diagnosis
+- `ADC out of range`
+- `Heater extruder tool0 not configured`
+- `Extruder not heating`
 
-**1. Check LED power:**
-- Verify 5V power supply
-- Check current capacity (60mA per LED)
-- Test with multimeter
+**Possible causes & fixes:**
 
-**2. Test individual LED:**
+- Wrong `sensor_type` or `sensor_pin`:
+  - Compare with your known-good single-extruder config
+  - Make sure you use the same thermistor type and wiring
 
-```gcode
-SET_LED LED=chamber_leds RED=1.0 GREEN=0 BLUE=0 INDEX=1
-```
+- Section names mismatch:
+  - If your macros expect `extruder tool0`, but your config says `[extruder]` only:
+    - Rename the section to match
+    - Or adapt the macros
 
-**If no response:**
-- Check data pin connection
-- Verify LED type in config (WS2812, SK6812, etc.)
-- Test with different index
-
-**3. Check LED chain counts:**
-
-```ini
-[neopixel chamber_leds]
-pin: PB0
-chain_count: 64    # ← Must match physical LED count
-```
-
-**4. Verify LED effects installed:**
-
-```bash
-ls -la ~/printer_data/config/ | grep led
-```
-
-**Should see:** `tc_led_effects.cfg` or similar
+- PID not tuned:
+  - Run a PID tune for each toolhead if needed
 
 ---
 
-### 🟡 KNOMI Display Issues
+## 3. Tool Pickup / Dropoff Problems
 
-#### Symptom
-- Displays won't wake
-- No connection to display
-- Firmware version errors
+### 3.1. Tool Crashes into Dock
 
-#### Diagnosis
+**Symptoms:**
 
-**1. Check network connectivity:**
+- Nozzle or carriage hits the dock walls
+- Dock flexes or tool pops out violently
 
-```bash
-ping knomi-t0.local
-ping knomi-t1.local
-# etc for each display
-```
+**Possible causes & fixes:**
 
-**2. Verify firmware version:**
+- Bad `dock_x`, `dock_y`, `dock_z` values:
+  - Manually move to those coordinates with low speed:
+    - `G1 X... Y... Z... F600`
+  - Adjust until positioning is safe
+  - Only then re-test automatic pickup
 
-KNOMI firmware v3.0+ required for sleep/wake features
+- Wrong `safe_z`:
+  - If `safe_z` is too low, moves over docks may hit hardware
+  - Increase `safe_z` in `toolchanger.cfg`
 
-**3. Test manual wake:**
-
-```gcode
-KNOMI_WAKE
-```
-
-**4. Check status:**
-
-```gcode
-CHECK_KNOMI_STATUS
-```
-
-#### Solutions
-
-**1. Update KNOMI firmware:**
-- Follow BTT instructions for firmware update
-- Use v3.0 or newer
-
-**2. Configure static IP:**
-- Prevents hostname resolution issues
-- Edit `knomi.cfg` with IP instead of hostname
-
-**3. Increase timeout:**
-
-```ini
-[gcode_macro KNOMI_WAKE]
-variable_timeout: 5    # Increase if slow network
-```
+- Acceleration too high:
+  - Temporarily reduce:
+    ```gcode
+    SET_VELOCITY_LIMIT VELOCITY=100 ACCEL=1500
+    ```
 
 ---
 
-## By Component
+### 3.2. Tool Fails to Engage / Drop
 
-### Toolchanger Core Module
+**Symptoms:**
 
-**Check module loaded:**
+- Tool partially docks but doesn’t lock
+- Tool doesn’t drop off completely
+- Pickup fails repeatedly
 
-```bash
-ls ~/klipper/klippy/extras/ | grep tool
-```
+**Possible causes & fixes:**
 
-**Should see:**
-- `toolchanger.py`
-- `tool.py`
-- `tools_calibrate.py`
-- etc.
+- Mechanical alignment off:
+  - Check that the dock is:
+    - Square to the axes
+    - At the correct height
+    - Firmly mounted (no wobble)
+  - Loosen, adjust, re-tighten
 
-**If missing:**
-```bash
-cd ~/klipper-toolchanger-extended
-./install.sh
-sudo systemctl restart klipper
-```
+- Dock positions slightly off:
+  - Use jog controls to find the “sweet spot”
+  - Update `dock_x`, `dock_y`, `dock_z` in the relevant `T*.cfg`
 
----
-
-### NUDGE Probe
-
-**Common issues:**
-
-**1. "Probe triggered prior to movement"**
-
-**Cause:** Nozzle already touching probe
-
-**Solution:**
-- Increase starting height
-- Check `lower_z` parameter
-- Verify probe isn't too tall
-
-**2. Inconsistent results**
-
-**Cause:** Dirty nozzle or probe
-
-**Solution:**
-- Clean nozzle with brass brush
-- Clean probe contact surface
-- Re-run calibration
-
-**3. "Probe did not trigger"**
-
-**Cause:** Not making contact
-
-**Solution:**
-- Increase `lower_z` parameter
-- Reduce `spread` if too far from center
-- Check probe wiring
+- Approach / retract speeds too high:
+  - Reduce `dock_speed` in `toolchanger.cfg`
+  - Re-test
 
 ---
 
-### Beacon Probe
+### 3.3. Two-Stage Pickup Fails Repeatedly
 
-**Common issues:**
+**Symptoms:**
 
-**1. "Beacon not responding"**
+- Macro reports:
+  - `Tool pickup verification failed`
+- Tool may appear correctly mounted but system aborts
 
-**Check connection:**
-```gcode
-BEACON_QUERY
-```
+**Possible causes & fixes:**
 
-**2. Contact mode not working**
+- Tool presence sensor logic inverted:
+  - Toggle the `tool_sensor_inverted` parameter
+  - Watch sensor state in console during manual attach/detach
 
-**Verify calibration:**
-```gcode
-BEACON_CALIBRATE
-```
+- Sensor not wired or broken:
+  - Check continuity / wiring
+  - Use a multimeter if needed
 
-**3. Z-offsets inaccurate**
-
-**Re-calibrate contact threshold:**
-```gcode
-BEACON_CALIBRATE
-# Then re-measure tool offsets
-MEASURE_TOOL_Z_OFFSETS INITIAL_TOOL=0
-```
+- Wrong `tool_sensor_pin`:
+  - Confirm the actual pin used
+  - Update config
 
 ---
 
-### Input Shaper (Per-Tool)
+## 4. Tool Presence / Sensors
 
-**Issue:** Input shaper not applying per tool
+### 4.1. False Tool Loss During Printing
 
-**Check `after_change_gcode`:**
+**Symptoms:**
 
-```ini
-[toolchanger]
-after_change_gcode:
-    {% if tool.params_input_shaper_freq_x %}
-        SET_INPUT_SHAPER SHAPER_FREQ_X={tool.params_input_shaper_freq_x}
-    {% endif %}
-```
+- Printer pauses with message like:
+  - `Active tool T1 lost - check tool attachment`
+- Tool is actually still attached
 
-**Verify it's being called:**
-```gcode
-# After tool change, check:
-GET_INPUT_SHAPER
-# Should match tool's parameters
-```
+**Possible causes & fixes:**
 
----
+- Noisy / bouncing sensor:
+  - Increase `tool_presence_timeout` (e.g. 2–3 seconds)
+  - Add filtering if possible (hardware or software debounce)
 
-## Error Messages
+- Loose connector:
+  - Check mechanical connection at the board and sensor
+  - Re-seat or re-solder as needed
 
-### "Toolchanger not initialized"
-
-**Meaning:** Toolchanger system needs initialization
-
-**Solution:**
-```gcode
-SET_INITIAL_TOOL TOOL=0
-```
+- Wrong logic level:
+  - `tool_sensor_inverted` may be wrong
+  - Verify sensor’s idle / active levels
 
 ---
 
-### "Tool X not found"
+### 4.2. Tool Sensor Always On or Always Off
 
-**Meaning:** Requested tool number not configured
+**Symptoms:**
 
-**Check:**
-- Tool file included in printer.cfg?
-- `tool_number` parameter set correctly?
-- No duplicate tool numbers?
+- Sensor state never changes, regardless of tool position
 
----
+**Possible causes & fixes:**
 
-### "Axis not homed"
+- Pin misconfigured:
+  - Check for typos in `tool_sensor_pin`
+  - Make sure no other section uses that pin
 
-**Meaning:** Required axes not homed before tool change
-
-**Solution:**
-```gcode
-G28    # Home all axes
-```
+- Sensor failure or wiring issue:
+  - Test sensor stand-alone
+  - Check for 5V/24V vs 3.3V compatibility
 
 ---
 
-### "Tool not detected after pickup"
+## 5. Calibration Macros Failing
 
-**Meaning:** Two-stage pickup verification failed
+### 5.1. `NUDGE_FIND_TOOL_OFFSETS` Errors
 
-**Causes:**
-1. Tool not fully seated
-2. Detection sensor not working
-3. Path doesn't reach verification point
+**Symptoms:**
 
-**See:** [Tool Change Failures](#tool-change-failures)
+- Macro aborts early
+- Error like:
+  - `Unknown command 'SET_INITIAL_TOOL'`
+  - Or moves don’t make sense
 
----
+**Possible causes & fixes:**
 
-### "Move out of range"
+- `SET_INITIAL_TOOL` not called beforehand:
+  - Always start with:
+    ```gcode
+    SET_INITIAL_TOOL TOOL=0
+    ```
+  - Replace `0` with your reference tool if different
 
-**Meaning:** Requested position outside printer limits
+- Wrong include order:
+  - Ensure `toolchanger.cfg` and `toolchanger_macros.cfg` are included
+    before any macros that use them
 
-**Check:**
-- Dock positions within printer bounds?
-- `position_max` in stepper config sufficient?
-- Z-height adequate for tool changes?
-
-**Solution:**
-```ini
-# Increase limits if needed
-[stepper_x]
-position_max: 350    # Increase if needed
-
-[stepper_z]
-position_max: 340    # Must clear tools at full height
-```
+- Dock positions extremely wrong:
+  - Make sure coarse dock positions are reasonable first
+  - Fix any collisions before running calibration
 
 ---
 
-## Log Analysis
+### 5.2. `MEASURE_TOOL_Z_OFFSETS` Errors
 
-### Reading klippy.log
+**Symptoms:**
 
-**View recent errors:**
-```bash
-tail -100 ~/printer_data/logs/klippy.log | grep -i error
-```
+- Probing fails
+- Macro aborts with probe-related errors
 
-**View toolchanger activity:**
-```bash
-tail -100 ~/printer_data/logs/klippy.log | grep -i tool
-```
+**Possible causes & fixes:**
 
-**Watch live log:**
-```bash
-tail -f ~/printer_data/logs/klippy.log
-```
+- Probe not configured or not working:
+  - Test probe:
+    - `PROBE` / `QUERY_PROBE`
+    - Run a standard Z calibration on T0
+  - Fix probe first
 
----
+- Wrong probe offsets:
+  - If probe is off by a lot, moves may be unsafe
+  - Make sure X/Y probe offset is roughly correct
 
-### Key Log Patterns
-
-**Normal tool change:**
-```
-Toolchanger: Dropping off tool T0
-Toolchanger: Picking up tool T1
-Toolchanger: Tool change complete
-```
-
-**Detection failure:**
-```
-Tool T1: Detection failed - tool not detected
-Toolchanger: Two-stage pickup verification failed
-```
-
-**Path execution:**
-```
-Tool T1: Executing pickup path
-Tool T1: Path point: X=25.3 Y=9.0 Z=326.0
-Tool T1: Path point: X=25.3 Y=8.0 Z=325.5 (verify)
-Tool T1: Verification passed
-```
+- Tools not fully seated:
+  - A loose tool will give inconsistent Z offsets
+  - Fix mechanical issues before calibration
 
 ---
 
-### Common Log Errors
+## 6. Print & Recovery Issues
 
-**"Option 'parameter_name' in section 'section' must be specified"**
+### 6.1. Resume Puts Nozzle in Wrong Place
 
-**Meaning:** Required parameter missing
+**Symptoms:**
 
-**Solution:** Add the missing parameter to config
+- After `RESUME`, nozzle:
+  - Comes back to an incorrect XY position
+  - Scrapes the print
 
----
+**Possible causes & fixes:**
 
-**"Unable to parse option 'parameter_name' in section 'section'"**
+- Incomplete state restoration:
+  - Check your `PAUSE` / `RESUME` macros
+  - Make sure they:
+    - Save the current position
+    - Restore it before resuming
+  - Compare with reference macros in `toolchanger_macros.cfg`
 
-**Meaning:** Invalid value format
-
-**Solution:** Check value syntax (quotes, numbers, etc.)
-
----
-
-**"Unknown command: COMMAND_NAME"**
-
-**Meaning:** Command not defined or module not loaded
-
-**Solution:**
-- Check spelling
-- Verify module installed
-- Ensure macro defined
+- Manual intervention without re-sync:
+  - If you manually jog or change tools during a pause:
+    - Use the provided recovery macros to re-sync
+    - Or re-home and carefully restart the job
 
 ---
 
-## Getting Support
+### 6.2. Heater Shut Down on Tool Loss (Expected but Surprising)
 
-### Before Asking for Help
+**Symptoms:**
 
-Gather this information:
+- A tool is reported lost
+- Its heater is turned off automatically
 
-1. **System Info:**
-   ```bash
-   # Klipper version
-   cd ~/klipper && git log -1 --oneline
-   
-   # Toolchanger version
-   cd ~/klipper-toolchanger-extended && git log -1 --oneline
-   ```
+**Explanation:**
 
-2. **Configuration:**
-   - Your `toolchanger.cfg`
-   - One tool config (TX.cfg)
-   - Relevant sections of `printer.cfg`
+- This is an intentional safety feature:
+  - If a tool is no longer attached, heating it can be dangerous
+  - The system shuts off the heater to avoid damage or fire risk
 
-3. **Logs:**
-   ```bash
-   # Last 200 lines of log with errors
-   tail -200 ~/printer_data/logs/klippy.log | grep -B5 -A5 -i error > ~/error_log.txt
-   ```
+**What to do:**
 
-4. **Behavior:**
-   - Exact error message
-   - What you expected to happen
-   - What actually happened
-   - Steps to reproduce
+1. Fix the mechanical issue (reattach tool, tighten screws, etc.)
+2. Re-run:
+   - Tool pickup & verification
+   - Any needed calibration
+3. Restart the print or use recovery macros if appropriate
 
 ---
 
-### Where to Get Help
+### 6.3. Random Emergency Stops
 
-**GitHub Issues:**
-- Bug reports: [New Issue](https://github.com/PrintStructor/klipper-toolchanger-extended/issues)
-- Use provided template
-- Include all gathered information
+**Symptoms:**
 
-**GitHub Discussions:**
-- General questions: [Discussions](https://github.com/PrintStructor/klipper-toolchanger-extended/discussions)
-- Configuration help
-- Tips and tricks
+- Printer halts with Klipper shutdown
+- Messages about MCU errors, stepper shutdown, etc.
 
-**Discord/Community:**
-- Real-time chat (if available)
-- Quick questions
-- Community experience sharing
+**Possible causes & fixes:**
 
----
+- Not specific to this fork – treat as usual Klipper issues:
+  - Power instability
+  - Overcurrent / stepper driver errors
+  - Temperature faults
+  - USB / CAN dropouts
 
-### Useful Commands for Support
-
-```bash
-# System info
-uname -a
-python3 --version
-
-# Klipper status
-sudo systemctl status klipper
-
-# Config backup
-tar -czf ~/config_backup.tar.gz ~/printer_data/config/
-
-# Full log
-cat ~/printer_data/logs/klippy.log | tail -500 > ~/klippy_full.log
-
-# CAN bus status
-ip link show can0
-~/klippy-env/bin/python ~/klipper/scripts/canbus_query.py can0
-```
+Fix these first, then re-test toolchanger behavior.
 
 ---
 
-## Quick Reference: Common Fixes
+## 7. Slicer & Workflow Issues
 
-| Problem | Quick Fix |
-|---------|-----------|
-| Not initialized | `SET_INITIAL_TOOL TOOL=0` |
-| Wrong detection | Toggle `!` on `detection_pin` |
-| Offsets wrong | `NUDGE_FIND_TOOL_OFFSETS` |
-| Z-height off | `MEASURE_TOOL_Z_OFFSETS` |
-| Tool stuck | Reduce `params_path_speed` |
-| CAN timeout | Check UUIDs, termination |
-| Axis not homed | `G28` |
-| LED not working | Check power, chain_count |
+### 7.1. Slicer Uses Its Own Toolchange G-Code
 
----
+**Symptoms:**
 
-## Related Documentation
+- Slicer injects custom toolchange macros
+- Conflicts with fork’s `T0` … `Tn` macros
+- Unexpected behavior between tool changes
 
-- [**Quick Start Guide**](QUICKSTART.md) - Initial setup
-- [**Configuration Guide**](CONFIGURATION.md) - Parameter reference
-- [**Calibration Guide**](CALIBRATION.md) - Calibration procedures
-- [**FAQ**](FAQ.md) - Common questions
+**Fix:**
+
+- Configure slicer to:
+  - Use **plain `T0`, `T1`, …`** for tool changes  
+  - Call your central `PRINT_START` / `PRINT_END` macros
+  - Avoid per-toolchange custom G-code (leave it to the fork’s macros)
 
 ---
 
-**Version:** 1.0.0  
-**Last Updated:** 2025-11-18  
-**License:** GPL-3.0
+### 7.2. First Tool Not Selected at Print Start
+
+**Symptoms:**
+
+- Print starts with no tool mounted
+- Or wrong tool used for first layer
+
+**Fix:**
+
+- In your `PRINT_START` macro:
+  - Explicitly select a tool, e.g.:
+
+    ```gcode
+    T0
+    ```
+
+  - Or set the initial tool based on slicer variable if you use one
+
+- Make sure your slicer:
+  - Either always starts with T0
+  - Or you handle first tool selection in `PRINT_START`
+
+---
+
+### 7.3. Different Temperatures Per Tool Not Honored
+
+**Symptoms:**
+
+- All tools use the same temperature
+- Slicer settings per tool appear ignored
+
+**Possible causes & fixes:**
+
+- Single `extruder` section used in slicer profile:
+  - Ensure your slicer:
+    - Has one extruder definition per tool
+    - Sends temperatures to the correct extruder / tool
+
+- Macro interference:
+  - Check `PRINT_START` / `TOOLCHANGE` macros for hard-coded temps
+  - Replace them with slicer-provided values or per-tool logic
+
+---
+
+## 8. General Debugging Tips
+
+- Always test **one tool at a time** before full multi-tool runs.
+- Start with:
+  - Homing
+  - Manual moves
+  - Dry toolchanges (cool bed, no filament)
+- Only then add:
+  - Calibration
+  - Real prints
+
+When stuck:
+
+1. Re-read the relevant section of:
+   - `QUICKSTART.md`
+   - `CONFIGURATION.md`
+   - `CALIBRATION.md`
+2. Check `klippy.log` for the **first error**, not the last line.
+3. Simplify:
+   - Disable non-essential features temporarily
+   - Test a minimal scenario
+4. Reintroduce complexity step by step.
+
+Once the basics are stable, the extended safety and recovery features will
+give you a much more forgiving and robust toolchanger experience.
