@@ -1,37 +1,43 @@
 #!/usr/bin/env bash
-# klipper-toolchanger-extended install script (v2)
+# klipper-toolchanger-extended install script (v2.1)
 
 set -euo pipefail
 export LC_ALL=C
 
-# --- Paths ---------------------------------------------------------
+###############################################################################
+# Paths & defaults
+###############################################################################
 
-# Wo Klipper installiert ist
+# Where Klipper is installed
 KLIPPER_PATH="${KLIPPER_PATH:-${HOME}/klipper}"
 
-# Pfad dieses Repos (Verzeichnis, in dem dieses Script liegt)
+# Path to this repository (directory of this script)
 INSTALL_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Klipper Config-Verzeichnis (Mainsail/Fluidd)
+# Klipper config directory (Mainsail/Fluidd)
 CONFIG_DIR="${CONFIG_DIR:-${HOME}/printer_data/config}"
 
-# Moonraker-Konfiguration
+# Moonraker config
 MOONRAKER_CONF="${MOONRAKER_CONF:-${CONFIG_DIR}/moonraker.conf}"
 
-# Beispiel-Configs im Repo
-EXAMPLES_DIR="${INSTALL_PATH}/examples/atom-tc-6tool"
+# Example configs in this repo
+EXAMPLES_DIR="${EXAMPLES_DIR:-${INSTALL_PATH}/examples/atom-tc-6tool}"
 
-# Zielordner für Beispiel-Configs in Mainsail
+# Target dirs for example configs (visible in Mainsail)
 EXAMPLES_TARGET_BASE="${CONFIG_DIR}/ATOM-toolchanger-examples"
 EXAMPLES_TARGET_ATOM="${EXAMPLES_TARGET_BASE}/atom"
 
-# --- Helper --------------------------------------------------------
+###############################################################################
+# Helper functions
+###############################################################################
 
-info()  { echo "[INFO] $*"; }
-warn()  { echo "[WARN] $*"; }
+info()  { echo "[INFO]  $*"; }
+warn()  { echo "[WARN]  $*"; }
 error() { echo "[ERROR] $*"; }
 
-# --- Header --------------------------------------------------------
+###############################################################################
+# Header
+###############################################################################
 
 echo
 echo "==========================================="
@@ -39,7 +45,9 @@ echo "- klipper-toolchanger-extended installer  -"
 echo "==========================================="
 echo
 
-# --- Pre-Checks ----------------------------------------------------
+###############################################################################
+# Pre-checks
+###############################################################################
 
 if [[ "$EUID" -eq 0 ]]; then
   error "Do not run this script as root. Use your normal user (e.g. 'pi')."
@@ -47,12 +55,15 @@ if [[ "$EUID" -eq 0 ]]; then
 fi
 
 if [[ ! -d "${KLIPPER_PATH}/klippy/extras" ]]; then
-  error "Klipper extras directory not found at: ${KLIPPER_PATH}/klippy/extras"
+  error "Klipper extras directory not found at:"
+  echo "       ${KLIPPER_PATH}/klippy/extras"
   error "Set KLIPPER_PATH or install Klipper first."
   exit 1
 fi
 
-# --- Link Python modules into Klipper -------------------------------
+###############################################################################
+# Link Python modules into Klipper
+###############################################################################
 
 echo
 info "Linking klipper-toolchanger-extended extras into Klipper ..."
@@ -73,12 +84,18 @@ done
 
 echo
 info "Restarting Klipper service ..."
-sudo systemctl restart klipper || {
-  error "Failed to restart Klipper via systemd."
-  exit 1
-}
+if command -v systemctl >/dev/null 2>&1; then
+  sudo systemctl restart klipper || {
+    error "Failed to restart Klipper via systemd."
+    exit 1
+  }
+else
+  warn "systemctl not found; please restart Klipper manually."
+fi
 
-# --- Moonraker update_manager block --------------------------------
+###############################################################################
+# Configure Moonraker update_manager
+###############################################################################
 
 echo
 info "Configuring Moonraker update manager (optional) ..."
@@ -99,14 +116,21 @@ managed_services: klipper
 EOF
     echo
     info "Added [update_manager klipper-toolchanger-extended] to ${MOONRAKER_CONF}"
-    info "Restarting Moonraker ..."
-    sudo systemctl restart moonraker || warn "Could not restart Moonraker automatically."
+
+    if command -v systemctl >/dev/null 2>&1; then
+      info "Restarting Moonraker ..."
+      sudo systemctl restart moonraker || warn "Could not restart Moonraker automatically."
+    else
+      warn "systemctl not found; please restart Moonraker manually."
+    fi
   fi
 else
   warn "Moonraker config not found at ${MOONRAKER_CONF}. Skipping update_manager setup."
 fi
 
-# --- Optional: Beispiel-Configs in Mainsail sichtbar machen --------
+###############################################################################
+# Optional: copy example configs into Mainsail config dir
+###############################################################################
 
 echo
 info "Example configuration files"
@@ -129,37 +153,55 @@ else
 
         mkdir -p "${EXAMPLES_TARGET_ATOM}"
 
-        # printer.cfg -> printer_example.cfg (kein Drop-in!)
-        if [[ -f "${EXAMPLES_DIR}/printer.cfg" ]]; then
-          if [[ -f "${EXAMPLES_TARGET_BASE}/printer_example.cfg" ]]; then
-            warn "printer_example.cfg already exists in target. Leaving as is."
-          else
-            cp "${EXAMPLES_DIR}/printer.cfg" "${EXAMPLES_TARGET_BASE}/printer_example.cfg"
-            info "  -> printer_example.cfg"
-          fi
-        fi
-
-        # alle anderen .cfg im Beispiel-Hauptverzeichnis (ohne printer.cfg)
+        # 1) Sort all *.cfg in EXAMPLES_DIR into appropriate targets
         for cfg in "${EXAMPLES_DIR}"/*.cfg; do
+          [[ -e "$cfg" ]] || continue
           bn="$(basename "$cfg")"
-          [[ "${bn}" == "printer.cfg" ]] && continue
-          if [[ -f "${EXAMPLES_TARGET_BASE}/${bn}" ]]; then
-            warn "  -> ${bn} already exists in target. Skipping."
+          dest=""
+
+          case "${bn}" in
+            # printer.cfg -> printer_example.cfg (not a drop-in!)
+            printer.cfg)
+              dest="${EXAMPLES_TARGET_BASE}/printer_example.cfg"
+              ;;
+
+            # Files that belong to the ATOM/toolchanger block
+            T*.cfg|calibrate_offsets.cfg|toolchanger.cfg|toolchanger_macros.cfg|knomi.cfg|tc_led_effects.cfg|beacon.cfg)
+              dest="${EXAMPLES_TARGET_ATOM}/${bn}"
+              ;;
+
+            # Other files (macros.cfg, mainsail.cfg, shell_command.cfg, etc.)
+            *)
+              dest="${EXAMPLES_TARGET_BASE}/${bn}"
+              ;;
+          esac
+
+          if [[ -z "${dest}" ]]; then
+            continue
+          fi
+
+          if [[ -f "${dest}" ]]; then
+            warn "  -> $(basename "${dest}") already exists. Skipping."
           else
-            cp "${cfg}" "${EXAMPLES_TARGET_BASE}/${bn}"
-            info "  -> ${bn}"
+            cp "${cfg}" "${dest}"
+            rel="${dest#${CONFIG_DIR}/}"
+            info "  -> ${rel}"
           fi
         done
 
-        # atom/*.cfg
+        # 2) If there is already an atom/ subdirectory in the repo, copy those as well
         if [[ -d "${EXAMPLES_DIR}/atom" ]]; then
           for cfg in "${EXAMPLES_DIR}/atom"/*.cfg; do
+            [[ -e "$cfg" ]] || continue
             bn="$(basename "$cfg")"
-            if [[ -f "${EXAMPLES_TARGET_ATOM}/${bn}" ]]; then
-              warn "  -> atom/${bn} already exists in target. Skipping."
+            dest="${EXAMPLES_TARGET_ATOM}/${bn}"
+
+            if [[ -f "${dest}" ]]; then
+              warn "  -> atom/${bn} already exists. Skipping."
             else
-              cp "${cfg}" "${EXAMPLES_TARGET_ATOM}/${bn}"
-              info "  -> atom/${bn}"
+              cp "${cfg}" "${dest}"
+              rel="${dest#${CONFIG_DIR}/}"
+              info "  -> ${rel}"
             fi
           done
         fi
@@ -171,8 +213,8 @@ else
         echo "You can now open them in Mainsail/Fluidd under:"
         echo "  Machine -> Config Files -> ATOM-toolchanger-examples/"
         echo
-        echo "Typical includes you will add to your real printer.cfg"
-        echo "(after moving/adjusting the configs to your preferred layout):"
+        echo "Typical includes you will add to your REAL printer.cfg"
+        echo "(after moving/renaming the configs to your preferred layout):"
         echo
         echo "  [include atom/toolchanger.cfg]"
         echo "  [include atom/toolchanger_macros.cfg]"
@@ -186,13 +228,14 @@ else
         echo
         echo "IMPORTANT:"
         echo "  These example configs are based on my own machine."
-        echo "  You MUST adjust:"
-        echo "   - CAN UUIDs"
-        echo "   - dock positions and coordinates"
-        echo "   - probe offsets & speeds"
-        echo "   - homing positions & limits"
+        echo "  You MUST adjust at least:"
+        echo "    - CAN UUIDs for toolhead boards"
+        echo "    - Dock positions & coordinates"
+        echo "    - Probe offsets & speeds"
+        echo "    - Homing positions & limits"
         echo "  before attempting any toolchanger moves."
         ;;
+
       *)
         info "Skipping example config copy."
         ;;
@@ -200,7 +243,11 @@ else
   fi
 fi
 
+###############################################################################
+# Done
+###############################################################################
+
 echo
 info "Installation finished."
-echo "klipper-toolchanger-extended is linked to Klipper."
+echo "klipper-toolchanger-extended is now linked to Klipper."
 echo
