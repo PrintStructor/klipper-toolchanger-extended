@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# klipper-toolchanger-extended install script (v2.1)
+# klipper-toolchanger-extended install script (v2.2)
 
 set -euo pipefail
 export LC_ALL=C
@@ -149,8 +149,24 @@ else
     case "${REPLY}" in
       [yY][eE][sS]|[yY])
         echo
-        info "Copying example configs ..."
 
+        # If examples target already exists, offer to reset it
+        if [[ -d "${EXAMPLES_TARGET_BASE}" ]]; then
+          warn "Existing example directory detected at:"
+          echo "       ${EXAMPLES_TARGET_BASE}"
+          read -r -p "[CONFIG] Remove and recreate this directory? (will delete old example files) [y/N] " CLEAN_REPLY
+          case "${CLEAN_REPLY}" in
+            [yY][eE][sS]|[yY])
+              info "Removing old example directory ..."
+              rm -rf "${EXAMPLES_TARGET_BASE}"
+              ;;
+            *)
+              info "Keeping existing example directory; new files will be added on top."
+              ;;
+          esac
+        fi
+
+        info "Copying example configs ..."
         mkdir -p "${EXAMPLES_TARGET_ATOM}"
 
         # 1) Sort all *.cfg in EXAMPLES_DIR into appropriate targets
@@ -207,7 +223,7 @@ else
         fi
 
         echo
-        info "Example configs copied to:"
+        info "Example configs are available at:"
         echo "  ${EXAMPLES_TARGET_BASE}"
         echo
         echo "You can now open them in Mainsail/Fluidd under:"
