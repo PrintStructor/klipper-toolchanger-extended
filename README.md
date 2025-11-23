@@ -401,6 +401,40 @@ For detailed setup and calibration workflows, see:
 
 ---
 
+## Where to start
+
+Depending on what you want to do, you don’t have to read everything in this repo.
+
+### 1. I want to use the ATOM 6-tool configuration
+
+Start here:
+
+1. **README.md**
+   - Read: *What This Is*, *For Beginners*, *Quick Start*
+2. **docs/QUICKSTART.md**
+   - Clone the repo, run `./install.sh`, make sure Klipper + Moonraker are set up
+3. **examples/atom-tc-6tool/README.md**
+   - Understand the example config layout and which values you MUST change
+4. **docs/CALIBRATION.md**
+   - Run XY and Z calibration for all tools
+5. **docs/TROUBLESHOOTING.md**
+   - Use this when something behaves differently than expected
+
+### 2. I’m evaluating if this project is right for me
+
+1. **README.md** – overall scope and hardware assumptions  
+2. **docs/WHY_THIS_FORK.md** – what this fork adds on top of the base project  
+3. **docs/FEATURE_COMPARISON.md** – differences vs. other popular solutions
+
+### 3. I want to customize or extend the system
+
+1. **README.md → What’s Included** – Python modules and config overview  
+2. **docs/CONFIGURATION.md** – all configuration options explained  
+3. `klipper/extras/*.py` – source code of the extended toolchanger modules  
+4. **CONTRIBUTING.md** – how to propose changes or add new hardware profiles
+
+---
+
 ## Documentation
 
 **Getting Started:**
