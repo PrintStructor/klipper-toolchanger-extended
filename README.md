@@ -1,11 +1,13 @@
 # Klipper Toolchanger Extended
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](https://github.com/PrintStructor/klipper-toolchanger-extended/releases)
+[![Version](https://img.shields.io/badge/version-1.0.1-green.svg)](https://github.com/PrintStructor/klipper-toolchanger-extended/releases)
 [![Klipper](https://img.shields.io/badge/Klipper-0.11+-orange.svg)](https://www.klipper3d.org/)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-printstructor-yellow.svg)](https://buymeacoffee.com/printstructor)
 
-**Version:** 1.0.0 | **Author:** PrintStructor | **License:** GPL-3.0  
+**Version:** 1.0.1 | **Author:** PrintStructor | **License:** GPL-3.0
 **Based on:** [viesturz/klipper-toolchanger](https://github.com/viesturz/klipper-toolchanger)
+> Latest stable: **v1.0.1** – tool loss & error recovery bugfixes
 
 > Klipper toolchanger extension with additional safety features, error recovery, and a complete working configuration for 6-tool VORON printers with ATOM toolheads.
 
@@ -547,6 +549,12 @@ Open an issue on GitHub with:
 - Post in community forums
 - Tag this project if sharing publicly
 - Consider contributing your config as an example
+
+**Want to support development?**
+
+If this project helped you get your toolchanger running (or saved a print from total disaster 🙃), you can support further development here:
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=000&style=flat-square)](https://buymeacoffee.com/printstructor)
 
 ---
 
