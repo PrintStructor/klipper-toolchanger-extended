@@ -177,11 +177,48 @@ class Tool:
         # Mapping for your setup:
         # Pin HIGH (True)  = Tool detected (on shuttle)  -> DETECT_PRESENT
         # Pin LOW  (False) = Tool not detected (in dock) -> DETECT_ABSENT
+        old_state = self.detect_state
         self.detect_state = toolchanger.DETECT_PRESENT if is_triggered else toolchanger.DETECT_ABSENT
+
         try:
             self.toolchanger.note_detect_change(self)
+
+            # Check for tool loss during active print
+            # CRITICAL: Only trigger if a print is actually running or paused!
+            # Prevents false alarms when manually changing tools after:
+            # - Print completion, CANCEL_PRINT, or manual tool changes
+            virtual_sdcard = self.printer.lookup_object('virtual_sdcard', None)
+            pause_resume = self.printer.lookup_object('pause_resume', None)
+            is_printing = (virtual_sdcard and virtual_sdcard.is_active()) or \
+                          (pause_resume and pause_resume.is_paused)
+
+            if (self == self.toolchanger.active_tool and
+                self.toolchanger.status == toolchanger.STATUS_READY and
+                old_state == toolchanger.DETECT_PRESENT and
+                self.detect_state != toolchanger.DETECT_PRESENT and
+                is_printing):  # ← Only trigger during active print or pause!
+                # Tool has dropped during print! Call safety handler
+                self._handle_tool_loss()
         except Exception as e:
             self.gcode.respond_info(f"Tool detect state update failed: {e}")
+
+    def _handle_tool_loss(self):
+        """Called when active tool is lost during operation (event-driven)."""
+        # 1. PAUSE print IMMEDIATELY (fastest response - before macro execution)
+        #    This stops the print and saves position automatically
+        self.gcode.run_script_from_command("PAUSE")
+
+        try:
+            # 2. Call the configured safety macro (heater off, Z-lift if safe, LED)
+            self.gcode.run_script_from_command("_TOOLCHANGER_TOOL_LOSS_HANDLER T=%d" % self.tool_number)
+        except Exception as e:
+            # Fallback: at minimum, report the error
+            self.gcode.respond_info(f"🚨 CRITICAL: Tool T{self.tool_number} lost! Handler failed: {e}")
+            # Try to pause as last resort
+            try:
+                self.printer.lookup_object('pause_resume').send_pause()
+            except Exception:
+                pass
 
     # ==============================================================================
     #                        Status & Offsets
