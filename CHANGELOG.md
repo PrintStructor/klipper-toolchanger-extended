@@ -17,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.1] - 2025-11-26
+
+### Fixed
+- Fixed pause/resume state corruption in error recovery when tool loss occurs
+  after a failed pickup (tool loss now correctly pauses the print again)
+- Fixed Z-offset being effectively applied twice during recovery by correcting
+  `extra_z_offset = current_z_offset - (tool_z_offset + global_z_offset)`
+- Prevented tool loss alarms from triggering on manual tool changes after a
+  finished or cancelled print by checking `virtual_sdcard.is_active()` and
+  `pause_resume.is_paused` before handling tool loss
+  
 ## [1.0.0] - 2025-11-18
 
 ### 🎉 Initial Release
@@ -242,5 +253,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
 
 ---
 
-[Unreleased]: https://github.com/PrintStructor/klipper-toolchanger-extended/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/PrintStructor/klipper-toolchanger-extended/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/PrintStructor/klipper-toolchanger-extended/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/PrintStructor/klipper-toolchanger-extended/releases/tag/v1.0.0

@@ -101,6 +101,8 @@ class Toolchanger:
         self.calibration_mode = False
         self.next_change_id = 1
         self.current_change_id = -1
+        self.last_change_restore_position = None
+        self.last_change_start_position = None
 
         self.printer.register_event_handler("homing:home_rails_begin",
                                             self._handle_home_rails_begin)
@@ -193,17 +195,46 @@ class Toolchanger:
             pass
 
     # ==============================================================================
-    #                          Graceful Error Handling
+    #                          Graceful Error Handling & Safety
     # ==============================================================================
 
-    def _pause_print(self):
-        """Pause the print safely (no shutdown)."""
+    def _save_tool_temperature_for_resume(self, tool):
+        """
+        CRITICAL SAFETY FEATURE: Save tool temperature before error handling.
+
+        This must be called BEFORE _process_error() because error_gcode might
+        turn off heaters. The saved temperature is used by RESUME to restore
+        heating after recovery.
+
+        This is part of the Python safety layer that users cannot accidentally break.
+        """
         try:
-            self.printer.lookup_object('pause_resume').send_pause()
-            self.gcode.respond_info("⏸️ Print paused due to toolchanger error")
+            if not tool or not tool.extruder_name:
+                return
+
+            extruder = self.printer.lookup_object(tool.extruder_name)
+            current_target = extruder.get_status(0)['target']
+
+            # Save to gcode variable for RESUME macro to use
+            # Using same variable as tool loss detection for consistency
+            self.gcode.run_script_from_command(
+                "SET_GCODE_VARIABLE MACRO=_TOOLCHANGER_RESUME_HANDLER VARIABLE=saved_target VALUE=%.1f" % current_target
+            )
+            self.gcode.respond_info("Safety: Saved temperature %.1f°C for recovery" % current_target)
+        except Exception as e:
+            # Non-fatal: RESUME can still work without temperature restoration
+            self.gcode.respond_info("Warning: Could not save temperature: %s" % str(e))
+
+    def _pause_print(self):
+        """Pause the print safely via PAUSE macro (saves temperature)."""
+        try:
+            # IMPORTANT: Use PAUSE macro (not send_pause()) to trigger temperature saving!
+            self.gcode.run_script_from_command("PAUSE")
         except Exception:
+            # Fallback to direct pause if macro fails
             try:
-                self.gcode.run_script_from_command("PAUSE")
+                self.printer.lookup_object('pause_resume').send_pause()
+                self.gcode.respond_info("⏸️ Print paused due to toolchanger error")
             except Exception:
                 pass
 
@@ -304,6 +335,8 @@ class Toolchanger:
                 'tool_names': self.tool_names,
                 'has_detection': self.has_detection,
                 'available_extruders': available_extruders,
+                'last_change_restore_position': self.last_change_restore_position,
+                'last_change_start_position': self.last_change_start_position,
                 }
 
     def _update_toolhead_extruders(self):
@@ -485,7 +518,8 @@ class Toolchanger:
                 if hasattr(tools_calibrate, 'initial_tool'):
                     tools_calibrate.initial_tool = None
                     tools_calibrate.initial_location = None
-                    self.gcode.respond_info("Reset: Initial tool in tools_calibrate")
+                    # Debug message removed - redundant with message at line 492
+                    # self.gcode.respond_info("Reset: Initial tool in tools_calibrate")
             except self.printer.config_error:
                 self.gcode.respond_info("Note: tools_calibrate object was not found")
 
@@ -620,11 +654,22 @@ class Toolchanger:
 
         try:
             self.status = STATUS_CHANGING
-            
+
             gcode_status = self.gcode_move.get_status()
             gcode_position = gcode_status['gcode_position']
             current_z_offset = gcode_status['homing_origin'][2]
-            extra_z_offset = current_z_offset - (self.active_tool.gcode_z_offset if self.active_tool else 0.0)
+
+            # Calculate extra_z_offset (baby-stepping, Z-tuning, etc.)
+            # We must account for BOTH tool offset AND global offset!
+            # Otherwise the global offset gets incorrectly treated as "extra"
+            try:
+                globals_macro = self.printer.lookup_object('gcode_macro globals')
+                global_offset = globals_macro.variables.get('global_z_offset', 0.06)
+            except:
+                global_offset = 0.06  # Fallback to default
+
+            expected_offset = (self.active_tool.gcode_z_offset if self.active_tool else 0.0) + global_offset
+            extra_z_offset = current_z_offset - expected_offset
 
             self.last_change_gcode_position = gcode_position
             self.last_change_start_position = self._position_to_xyz(gcode_position, 'xyz')
@@ -651,20 +696,89 @@ class Toolchanger:
                                self.active_tool.dropoff_gcode, extra_context)
 
             self._configure_toolhead_for_tool(tool)
+
+            # --- PICKUP (STAGE-AWARE) ---
             if tool is not None:
-                self.run_gcode('tool.pickup_gcode',
-                               tool.pickup_gcode, extra_context)
-                if self.has_detection and self.verify_tool_pickup:
-                    self.validate_detected_tool(tool, respond_info=gcmd.respond_info, raise_error=gcmd.error)
-                self.run_gcode('after_change_gcode',
-                               tool.after_change_gcode, extra_context)
+                # Check if tool has stage-based templates
+                has_stage1 = hasattr(tool, 'pickup_gcode_stage1') and tool.pickup_gcode_stage1 is not None
+                has_stage2 = hasattr(tool, 'pickup_gcode_stage2') and tool.pickup_gcode_stage2 is not None
 
-            self._restore_axis(gcode_position, restore_axis, tool)
+                if has_stage1:
+                    # Stage 1: Move to detection point
+                    self.run_gcode('pickup_gcode_stage1', tool.pickup_gcode_stage1, extra_context)
+                    if self.status == STATUS_ERROR:
+                        self._pause_print()
+                        self.gcode.run_script_from_command("RESTORE_GCODE_STATE NAME=_toolchange_state MOVE=0")
+                        return
 
-            self.gcode.run_script_from_command(
-                "RESTORE_GCODE_STATE NAME=_toolchange_state MOVE=0")
+                    # Verify tool detected
+                    if self.has_detection and self.verify_tool_pickup:
+                        ok = self._wait_for_detection_state(tool, expect_present=True, retries=10, delay=0.1)
+                        if not ok:
+                            self._flush_motion_and_freeze_position()
+                            safe_y = self.params.get('params_safe_y', 105)
+
+                            # CRITICAL SAFETY: Save temperature BEFORE error_gcode runs!
+                            # This is part of the safety system - error_gcode might turn off heaters
+                            self._save_tool_temperature_for_resume(tool)
+
+                            self.gcode.respond_info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                            self.gcode.respond_info("📋 RECOVERY STEPS:")
+                            self.gcode.respond_info("1. Manually attach T%d to the shuttle" % tool.tool_number)
+                            self.gcode.respond_info("2. Run: G0 Y%d F6000" % safe_y)
+                            self.gcode.respond_info("3. Run: RESUME (will auto-heat and continue)")
+                            self.gcode.respond_info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                            self._process_error("Tool pickup verification failed (stage1)")
+                            self._pause_print()
+                            self.gcode.run_script_from_command("RESTORE_GCODE_STATE NAME=_toolchange_state MOVE=0")
+                            return
+
+                        # Double-check: correct tool?
+                        self.note_detect_change(tool)
+                        if self.detected_tool != tool:
+                            self._flush_motion_and_freeze_position()
+
+                            # CRITICAL SAFETY: Save temperature BEFORE error_gcode runs!
+                            self._save_tool_temperature_for_resume(tool)
+
+                            self._process_error(
+                                "Tool mismatch: expected %s, detected %s" % (tool.name, self.detected_tool.name if self.detected_tool else 'None')
+                            )
+                            self._pause_print()
+                            self.gcode.run_script_from_command("RESTORE_GCODE_STATE NAME=_toolchange_state MOVE=0")
+                            return
+
+                    # Stage 2: Complete pickup (only if stage1 succeeded)
+                    if has_stage2:
+                        self.run_gcode('pickup_gcode_stage2', tool.pickup_gcode_stage2, extra_context)
+                        if self.status == STATUS_ERROR:
+                            self._pause_print()
+                            self.gcode.run_script_from_command("RESTORE_GCODE_STATE NAME=_toolchange_state MOVE=0")
+                            return
+                else:
+                    # Legacy single-stage pickup
+                    self.run_gcode('pickup_gcode', tool.pickup_gcode, extra_context)
+                    if self.status == STATUS_ERROR:
+                        self._pause_print()
+                        self.gcode.run_script_from_command("RESTORE_GCODE_STATE NAME=_toolchange_state MOVE=0")
+                        return
+                    if self.has_detection and self.verify_tool_pickup:
+                        self.validate_detected_tool(tool, respond_info=gcmd.respond_info, raise_error=gcmd.error)
+
+            # Restore state (this will restore old offsets - which were 0)
+            self.gcode.run_script_from_command("RESTORE_GCODE_STATE NAME=_toolchange_state MOVE=0")
+
+            # NOW set the correct Z / XY offsets AFTER RESTORE_GCODE_STATE
             if tool is not None:
                 self._set_tool_gcode_offset(tool, extra_z_offset)
+
+            # After-change - now with correct offsets active
+            if tool:
+                self.run_gcode('after_change_gcode', tool.after_change_gcode, extra_context)
+                if self.status == STATUS_ERROR:
+                    self._pause_print()
+                    self.gcode.run_script_from_command("RESTORE_GCODE_STATE NAME=_toolchange_state MOVE=0")
+                    return
 
             self.status = STATUS_READY
             if tool:
@@ -681,16 +795,54 @@ class Toolchanger:
                 raise
 
     def _recover_position(self, gcmd, tool):
+        """
+        CRITICAL SAFETY FEATURE: Recover from toolchanger error.
+
+        This method is part of the Python safety layer and handles complete recovery:
+        1. Run tool's recover_gcode (if any)
+        2. Restore position to where the toolchange started
+        3. Restore gcode state
+        4. Resume the print
+
+        Called by: INITIALIZE_TOOLCHANGER RECOVER=1
+        """
         extra_context = {
             'pickup_tool': tool.name if tool else None,
             'start_position': self.last_change_start_position,
             'restore_position': self.last_change_restore_position,
         }
         self.run_gcode('recover_gcode', tool.recover_gcode, extra_context)
-        self._restore_axis(self.last_change_gcode_position, self.last_change_restore_axis, tool)
+
+        # CRITICAL: For pickup error recovery, ALWAYS restore ALL axes (xyz)!
+        # Normal toolchanges use t_command_restore_axis (usually 'z') for print quality,
+        # but error recovery MUST restore full position to continue printing correctly!
+        self._restore_axis(self.last_change_gcode_position, 'xyz', tool)
         self.gcode.run_script_from_command(
             "RESTORE_GCODE_STATE NAME=_toolchange_state MOVE=0")
         self._set_tool_gcode_offset(tool, self.last_change_extra_z_offset)
+
+        # CRITICAL: Properly resume after successful recovery!
+        # We already restored position via _restore_axis(), so we must NOT call RESUME_BASE
+        # (it would try to restore to the DOCK position saved by PAUSE!)
+        # Instead, use pause_resume's send_resume_command() which properly clears ALL flags:
+        #   - is_paused = False
+        #   - sd_paused = False
+        #   - pause_command_sent = False
+        # This ensures subsequent PAUSE commands (like Tool Loss) will work correctly!
+        try:
+            pause_resume = self.printer.lookup_object('pause_resume')
+
+            # Call the proper resume method which clears ALL pause-related flags
+            # This is CRITICAL - if we only set is_paused=False, the other flags
+            # (sd_paused, pause_command_sent) remain True, which breaks subsequent PAUSE!
+            pause_resume.send_resume_command()
+
+            # Now clear the main pause flag
+            pause_resume.is_paused = False
+
+            self.gcode.respond_info("✅ Recovery complete - print resumed (all flags cleared)")
+        except Exception as e:
+            self.gcode.respond_info("Warning: Could not resume print: %s" % str(e))
 
     def test_tool_selection(self, gcmd, restore_axis):
         if self.status != STATUS_READY:
@@ -819,22 +971,58 @@ class Toolchanger:
     def _set_tool_gcode_offset(self, tool, extra_z_offset):
         if tool is None:
             return
-        
-        cmd = 'SET_GCODE_OFFSET'
-        if tool.gcode_x_offset is not None:
-            cmd += ' X=%f' % (tool.gcode_x_offset,)
-        if tool.gcode_y_offset is not None:
-            cmd += ' Y=%f' % (tool.gcode_y_offset,)
-        if tool.gcode_z_offset is not None:
-            cmd += ' Z=%f' % (tool.gcode_z_offset + extra_z_offset,)
-        self.gcode.run_script_from_command(cmd)
-        
+
+        try:
+            globals_macro = self.printer.lookup_object('gcode_macro globals')
+            global_offset = globals_macro.variables.get('global_z_offset', 0.06)
+
+            # --- Z-Offset Logic ---
+            # During calibration mode, do NOT apply Z-offsets (they are being measured)
+            if self.calibration_mode:
+                self.gcode.run_script_from_command('SET_GCODE_OFFSET Z=0 ABSOLUTE=1')
+                self.gcode.respond_info("⚙️ Calibration mode: Z-offset set to 0 for T%d" % tool.tool_number)
+            elif tool == self.initial_tool:
+                # Initial tool: only global offset
+                total_offset = global_offset + extra_z_offset
+                self.gcode.respond_info("Restored initial tool (T%d) with global offset: %.3f" %
+                                        (tool.tool_number, total_offset))
+                self.gcode.run_script_from_command('SET_GCODE_OFFSET Z=%.3f ABSOLUTE=1' % (total_offset,))
+            else:
+                # Other tools: tool offset + global offset
+                z_offset = self.initial_tool.z_offsets.get(tool.tool_number, 0.0) if self.initial_tool else 0.0
+                total_offset = z_offset + global_offset + extra_z_offset
+                self.gcode.respond_info("Setting Z-offset for T%d: tool=%.3f, global=%.3f, extra=%.3f, total=%.3f" %
+                                        (tool.tool_number, z_offset, global_offset, extra_z_offset, total_offset))
+                self.gcode.run_script_from_command('SET_GCODE_OFFSET Z=%.3f ABSOLUTE=1' % (total_offset,))
+
+            # --- XY-Offset Logic ---
+            if tool == self.initial_tool:
+                # Initial tool: XY offset = 0
+                self.gcode.run_script_from_command("SET_GCODE_OFFSET X=0 Y=0 ABSOLUTE=1")
+                self.gcode.respond_info("Initial tool T%d: setting reference XY-offset to 0" % tool.tool_number)
+            elif (self.initial_tool and hasattr(self.initial_tool, 'xy_offsets') and
+                  tool.tool_number in self.initial_tool.xy_offsets):
+                # Other tools: use calibrated XY offsets relative to initial tool
+                x_offset, y_offset = self.initial_tool.xy_offsets[tool.tool_number]
+                self.gcode.run_script_from_command(
+                    "SET_GCODE_OFFSET X=%.6f Y=%.6f ABSOLUTE=1" % (x_offset, y_offset))
+                self.gcode.respond_info(
+                    "Setting XY-offset for T%d: X=%.6f, Y=%.6f" % (tool.tool_number, x_offset, y_offset))
+            else:
+                # No XY offsets available
+                self.gcode.run_script_from_command("SET_GCODE_OFFSET X=0 Y=0 ABSOLUTE=1")
+
+        except Exception as e:
+            self.gcode.respond_info("Error setting offset: %s" % str(e))
+
+        # Bed mesh offset adjustment
         mesh = self.printer.lookup_object('bed_mesh', default=None)
         if mesh and mesh.get_mesh():
+            # Get current offsets from gcode_move
+            current_offsets = self.gcode_move.get_status()['homing_origin']
             self.gcode.run_script_from_command(
                 'BED_MESH_OFFSET X=%.6f Y=%.6f ZFADE=%.6f' %
-                (-tool.gcode_x_offset, -tool.gcode_y_offset,
-                 -tool.gcode_z_offset))
+                (-current_offsets[0], -current_offsets[1], -current_offsets[2]))
 
     def _position_to_xyz(self, position, axis):
         result = {}
