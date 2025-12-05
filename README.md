@@ -9,6 +9,10 @@
 **Based on:** [viesturz/klipper-toolchanger](https://github.com/viesturz/klipper-toolchanger)
 > Latest stable: **v1.0.1** – tool loss & error recovery bugfixes
 
+<p align="center">
+  <img src="docs/images/ATOM-TOOL_CHANGE_720.gif" alt="ATOM 6-Head Toolchanger System" width="100%">
+</p>
+
 > Klipper toolchanger extension with additional safety features, error recovery, and a complete working configuration for 6-tool VORON printers with ATOM toolheads.
 
 ---
