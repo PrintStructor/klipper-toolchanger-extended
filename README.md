@@ -5,13 +5,17 @@
 [![Klipper](https://img.shields.io/badge/Klipper-0.11+-orange.svg)](https://www.klipper3d.org/)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-printstructor-yellow.svg)](https://buymeacoffee.com/printstructor)
 
+---
+
+<p align="center">
+  <img src="docs/images/ATOM-TOOL_CHANGE_720.gif" alt="ATOM 6-Head Toolchanger in Action" width="100%">
+</p>
+
+---
+
 **Version:** 1.0.1 | **Author:** PrintStructor | **License:** GPL-3.0
 **Based on:** [viesturz/klipper-toolchanger](https://github.com/viesturz/klipper-toolchanger)
 > Latest stable: **v1.0.1** – tool loss & error recovery bugfixes
-
-<p align="center">
-  <img src="docs/images/ATOM-TOOL_CHANGE_720.gif" alt="ATOM 6-Head Toolchanger System" width="100%">
-</p>
 
 > Klipper toolchanger extension with additional safety features, error recovery, and a complete working configuration for 6-tool VORON printers with ATOM toolheads.
 
@@ -185,9 +189,31 @@ This configuration is designed for:
 
 **Optional:**
 
-- KNOMI display for status visualization
 - LED strips for tool/dock status
 - Per-tool filament sensors
+
+---
+
+## Optional Hardware Integration
+
+### 🖥️ KNOMI Display Support
+
+Real-time visual feedback and status display via BTT KNOMI:
+
+**Repository:** [PrintStructor/knomi-toolchanger](https://github.com/PrintStructor/knomi-toolchanger)
+
+<p align="center">
+  <img src="https://github.com/PrintStructor/knomi-toolchanger/raw/master/docs/images/KNOMI-6-TC_720.gif" alt="KNOMI Toolchanger Display" width="600">
+</p>
+
+**Features:**
+- Live tool status indication
+- Temperature monitoring for all extruders
+- Print progress visualization
+- Error state alerts
+- Animated tool change sequences
+
+The KNOMI integration provides an intuitive visual interface for monitoring your multi-tool setup, making it easier to track which tools are active, their temperatures, and overall system status at a glance.
 
 ---
 
