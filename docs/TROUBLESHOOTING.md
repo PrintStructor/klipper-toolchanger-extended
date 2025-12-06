@@ -198,7 +198,7 @@ things go wrong.
 - Tool may appear correctly mounted but system aborts
 
 <p align="center">
-  <img src="images/ATOM-PICKUP_FAILURE_720.gif" alt="Pickup Failure Recovery" width="600">
+  <img src="images/ATOM-PICKUP_FAILURE_1080.gif" alt="Pickup Failure Recovery" width="600">
   <br>
   <em>Example: Automatic recovery from pickup failure</em>
 </p>
