@@ -198,7 +198,7 @@ things go wrong.
 - Tool may appear correctly mounted but system aborts
 
 <p align="center">
-  <img src="images/ATOM-PICKUP_FAILURE_1080.gif" alt="Pickup Failure Recovery" width="600">
+  <img src="images/ATOM-PICKUP_FAILURE_1080.gif" alt="Pickup Failure Recovery" width="100%">
   <br>
   <em>Example: Automatic recovery from pickup failure</em>
 </p>
@@ -352,7 +352,7 @@ things go wrong.
 - Its heater is turned off automatically
 
 <p align="center">
-  <img src="images/ATOM-TOOL_LOSS_720.gif" alt="Tool Loss Detection and Recovery" width="600">
+  <img src="images/ATOM-TOOL_LOSS_720.gif" alt="Tool Loss Detection and Recovery" width="100%">
   <br>
   <em>Example: Automatic detection and recovery from tool loss during print</em>
 </p>
