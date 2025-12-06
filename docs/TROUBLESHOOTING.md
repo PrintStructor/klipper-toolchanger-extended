@@ -359,9 +359,16 @@ things go wrong.
 
 **Explanation:**
 
-- This is an intentional safety feature:
+- This is an intentional safety feature with multiple protective actions:
+  - **Immediate stop:** Print movement halts instantly when tool loss is detected
+  - **Z-lift:** The toolhead moves up slightly to prevent bed/print damage
+  - **Heater shutdown:** The lost tool's heater is turned off automatically
+  - **Pause state:** System pauses to allow safe recovery
+
+- Why this happens:
   - If a tool is no longer attached, heating it can be dangerous
-  - The system shuts off the heater to avoid damage or fire risk
+  - Continuing movement without a tool could damage the print or bed
+  - Z-lift prevents nozzle collision with the print surface
 
 **What to do:**
 
