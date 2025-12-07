@@ -668,7 +668,16 @@ class Toolchanger:
             except:
                 global_offset = 0.06  # Fallback to default
 
-            expected_offset = (self.active_tool.gcode_z_offset if self.active_tool else 0.0) + global_offset
+            # CRITICAL: Use the SAME offset source as in the apply logic (line 992)!
+            # We must use initial_tool.z_offsets, not active_tool.gcode_z_offset
+            if self.active_tool == self.initial_tool:
+                active_tool_offset = 0.0
+            elif self.initial_tool and hasattr(self.initial_tool, 'z_offsets'):
+                active_tool_offset = self.initial_tool.z_offsets.get(self.active_tool.tool_number, 0.0)
+            else:
+                active_tool_offset = 0.0
+
+            expected_offset = active_tool_offset + global_offset
             extra_z_offset = current_z_offset - expected_offset
 
             self.last_change_gcode_position = gcode_position
