@@ -33,6 +33,21 @@ Before you start, make sure you have:
 - Tool‑presence / dock sensors (microswitch, hall sensor, etc.)
 - An emergency stop button within reach during first tests
 
+**Required Klipper Extensions:**
+
+Some features require additional Klipper extensions:
+
+- ✅ **[gcode_shell_command](https://github.com/dw-0/kiauh)** - Required for KNOMI display and Beacon calibration automation
+
+  **Installation via KIAUH:**
+  ```bash
+  cd ~/kiauh
+  ./kiauh.sh
+  # Select: 4) [Advanced] → 8) [G-Code Shell Command]
+  ```
+
+  > **Note:** If you don't use KNOMI (`knomi.cfg`) or automated Beacon calibration (`calibrate_offsets.cfg`), you can skip installing shell_command.
+
 ---
 
 ## 2. Install the Fork

@@ -77,6 +77,23 @@ Only if you're building a physical multi-tool system with:
 - Mechanical assembly skills
 - Time for calibration and tuning
 
+**Required Klipper Extensions:**
+
+This project uses additional Klipper extensions that must be installed separately:
+
+- **[gcode_shell_command](https://github.com/dw-0/kiauh)** - Required for:
+  - KNOMI display integration (sleep/wake commands)
+  - Beacon calibration automation (capture/save functions)
+
+  **Installation via KIAUH:**
+  ```bash
+  cd ~/kiauh
+  ./kiauh.sh
+  # Select: 4) [Advanced] → 8) [G-Code Shell Command]
+  ```
+
+  If you don't use KNOMI or automated Beacon calibration, you can skip the shell_command configs.
+
 ---
 
 ## Technical Differences from Base Project
