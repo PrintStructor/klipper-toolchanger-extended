@@ -125,6 +125,8 @@ Core Klipper extensions included in this fork:
 - `toolchanger.py` - Core toolchanger logic with two-stage pickup
 - `tool.py` - Individual tool management
 - `tools_calibrate.py` - NUDGE probe XY calibration
+- `tool_xy_calibration.py` - XY offset saving for kTAMV integration
+- `tool_z_adjust.py` - Per-tool Z babystepping during prints
 - `rounded_path.py` - Smooth curved motion paths
 
 **Helper modules:**
@@ -182,6 +184,13 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for detailed guidelines.
 
 ## 🔄 Recent Updates
 
+**v1.1.0 (2026-01-10):**
+- ✨ Batch calibration macros (KTAMV_CALIBRATE_ALL_TOOLS_XY, BEACON_CALIBRATE_ALL_TOOLS_Z)
+- 🎯 Per-tool Z babystepping (SET_TOOL_Z_ADJUST, GLOBAL_Z_ADJUST)
+- 📷 kTAMV integration for camera-based XY calibration
+- 🔧 New modules: tool_xy_calibration.py, tool_z_adjust.py
+- 🔓 Dynamic tool count support (7+ tools now work)
+
 **v1.0.0 (2025-11-20):**
 - ✨ Comprehensive user documentation added
 - 📝 Technical reference guides created
@@ -191,6 +200,6 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for detailed guidelines.
 
 ---
 
-**Version:** 1.1.0  
-**Last Updated:** 2025-11-20  
+**Version:** 1.1.0
+**Last Updated:** 2026-01-10
 **License:** GPL-3.0

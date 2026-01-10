@@ -365,5 +365,5 @@ Choose based on:
 
 ---
 
-**Last updated:** 2025-11-20  
+**Last updated:** 2026-01-10  
 **Version:** 1.1.0
