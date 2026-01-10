@@ -329,6 +329,10 @@ This project works with several external Klipper plugins:
 
 Install these according to their respective documentation before proceeding.
 
+### Already using v1.0.x?
+
+If you're upgrading from a previous version, see the **[Upgrade Guide](docs/UPGRADE.md)** for step-by-step instructions. Don't overwrite your `printer.cfg` – it contains your calibrated offsets!
+
 ### Installation
 
 **1. Clone the repository:**
@@ -505,8 +509,9 @@ Start here:
 
 **Reference:**
 
-- [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) – Common issues and solutions  
-- [CHANGELOG.md](CHANGELOG.md) – Version history  
+- [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) – Common issues and solutions
+- [UPGRADE.md](docs/UPGRADE.md) – Upgrading from previous versions
+- [CHANGELOG.md](CHANGELOG.md) – Version history
 - [CONTRIBUTING.md](CONTRIBUTING.md) – How to contribute
 
 **Hardware:**
