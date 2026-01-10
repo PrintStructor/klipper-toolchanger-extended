@@ -479,8 +479,7 @@ Start here:
 ### 2. I’m evaluating if this project is right for me
 
 1. **README.md** – overall scope and hardware assumptions  
-2. **docs/WHY_THIS_FORK.md** – what this fork adds on top of the base project  
-3. **docs/FEATURE_COMPARISON.md** – differences vs. other popular solutions
+2. **docs/ABOUT.md** – what this fork adds and comparison with other solutions
 
 ### 3. I want to customize or extend the system
 
@@ -496,8 +495,7 @@ Start here:
 **Getting Started:**
 
 - [QUICKSTART.md](docs/QUICKSTART.md) – Installation and basic setup  
-- [WHY_THIS_FORK.md](docs/WHY_THIS_FORK.md) – What this fork provides  
-- [FEATURE_COMPARISON.md](docs/FEATURE_COMPARISON.md) – Comparison with other solutions
+- [ABOUT.md](docs/ABOUT.md) – What this fork provides and comparison with other solutions
 
 **Configuration:**
 

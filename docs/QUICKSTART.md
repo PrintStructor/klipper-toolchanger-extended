@@ -296,9 +296,8 @@ Watch this print in full. If everything looks good:
 
 ## 10. Where to Go Next
 
-- Read **`WHY_THIS_FORK.md`** for background and design philosophy  
-- Check **`FEATURE_COMPARISON.md`** to see how this fork differs from others  
-- Study **`CALIBRATION.md`** for deeper understanding of XY/Z workflows  
+- Read **`ABOUT.md`** for background and feature comparison
+- Study **`CALIBRATION.md`** for deeper understanding of XY/Z workflows
 - Explore **`examples/atom-tc-6tool/README.md`** for the full reference setup
 
 Once you're comfortable, you can start:

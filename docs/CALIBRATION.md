@@ -580,7 +580,4 @@ SAVE_TOOL_Z_ADJUSTMENTS
 Once these steps are done, your tool offsets should be solid enough
 to run real multi‑tool prints with confidence.
 
-For deeper background and real‑world examples, see:
-
-- `WHY_THIS_FORK.md`
-- `SUCCESS_STORIES.md`
+For deeper background, see [ABOUT.md](ABOUT.md).
