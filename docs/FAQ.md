@@ -713,6 +713,6 @@ Post-processing scripts:
 
 ---
 
-**Version:** 1.0.0  
+**Version:** 1.1.0  
 **Last Updated:** 2025-11-18  
 **License:** GPL-3.0

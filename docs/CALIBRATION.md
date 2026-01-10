@@ -14,6 +14,20 @@ The examples assume:
 
 ---
 
+## 📌 ATOM TC-6 Users
+
+**If you're using the ATOM TC-6 toolchanger**, see the dedicated guide:
+- [**ATOM TC-6 Calibration Guide**](../examples/atom-tc-6tool/CALIBRATION_GUIDE.md)
+
+The ATOM implementation uses enhanced calibration methods:
+- **kTAMV** (camera-based XY calibration) - primary method
+- **NUDGE** (physical probe) - backup method
+- **BEACON_CALIBRATE_Z** - specialized Z calibration macro
+
+This generic guide covers the standard NUDGE-based workflow for all other printers.
+
+---
+
 ## 1. Calibration Philosophy
 
 The fork assumes:

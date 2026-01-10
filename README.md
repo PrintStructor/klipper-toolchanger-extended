@@ -1,7 +1,7 @@
 # Klipper Toolchanger Extended
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Version](https://img.shields.io/badge/version-1.0.1-green.svg)](https://github.com/PrintStructor/klipper-toolchanger-extended/releases)
+[![Version](https://img.shields.io/badge/version-1.1.0-green.svg)](https://github.com/PrintStructor/klipper-toolchanger-extended/releases)
 [![Klipper](https://img.shields.io/badge/Klipper-0.11+-orange.svg)](https://www.klipper3d.org/)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-printstructor-yellow.svg)](https://buymeacoffee.com/printstructor)
 
@@ -13,9 +13,9 @@
 
 ---
 
-**Version:** 1.0.1 | **Author:** PrintStructor | **License:** GPL-3.0
+**Version:** 1.1.0 | **Author:** PrintStructor | **License:** GPL-3.0
 **Based on:** [viesturz/klipper-toolchanger](https://github.com/viesturz/klipper-toolchanger)
-> Latest stable: **v1.0.1** – tool loss & error recovery bugfixes
+> Latest stable: **v1.1.0** – batch calibration, per-tool babystepping, kTAMV integration
 
 > Klipper toolchanger extension with additional safety features, error recovery, and a complete working configuration for 6-tool VORON printers with ATOM toolheads.
 
@@ -38,10 +38,16 @@ This is an extension of [viesturz/klipper-toolchanger](https://github.com/viestu
 - LED status integration
 
 **Calibration Workflows:**
-- NUDGE probe for XY offset measurement
-- Beacon contact probe for Z offset calibration
-- Automated measurement workflows
+- **kTAMV** (camera-based) for precise XY offset measurement – primary method
+- **NUDGE** probe for XY calibration – backup method when camera unavailable
+- **Beacon** contact probe for Z offset calibration
+- Batch calibration macros (all tools in one run)
 - Configuration saved via SAVE_CONFIG
+
+**Per-Tool Z Babystepping:**
+- Live Z-offset adjustments during printing (RAM-based)
+- Global Z-adjust affecting all tools equally
+- Save adjustments to config when satisfied
 
 **Flexibility:**
 - Any tool can be used as the initial reference tool (not limited to T0)
@@ -77,22 +83,17 @@ Only if you're building a physical multi-tool system with:
 - Mechanical assembly skills
 - Time for calibration and tuning
 
-**Required Klipper Extensions:**
+**Optional Klipper Extensions:**
 
-This project uses additional Klipper extensions that must be installed separately:
+- **[gcode_shell_command](https://github.com/dw-0/kiauh)** - Optional, only needed for:
+  - KNOMI display integration (sleep/wake via HTTP)
 
-- **[gcode_shell_command](https://github.com/dw-0/kiauh)** - Required for:
-  - KNOMI display integration (sleep/wake commands)
-  - Beacon calibration automation (capture/save functions)
-
-  **Installation via KIAUH:**
+  **Installation via KIAUH (if needed):**
   ```bash
   cd ~/kiauh
   ./kiauh.sh
   # Select: 4) [Advanced] → 8) [G-Code Shell Command]
   ```
-
-  If you don't use KNOMI or automated Beacon calibration, you can skip the shell_command configs.
 
 ---
 
@@ -278,11 +279,12 @@ Located in `klipper/extras/`:
 - **`toolchanger.py`** – Core toolchanger logic (from viesturz base)
 - **`tool.py`** – Tool state management and operations
 - **`rounded_path.py`** – Smooth movement paths for toolchanges
-- **`tools_calibrate.py`** – XY/Z offset calibration workflows
+- **`tools_calibrate.py`** – XY/Z offset calibration workflows (NUDGE)
+- **`tool_xy_calibration.py`** – XY offset saving for kTAMV integration
+- **`tool_z_adjust.py`** – Per-tool Z babystepping (live adjustments)
 - **`tc_config_helper.py`** – Configuration parsing and validation
 - **`tc_beacon_capture.py`** – Beacon probe integration for Z calibration
 - **`tc_save_config_value.py`** – SAVE_CONFIG integration for storing offsets
-- **`tc_save_beacon_contact.sh`** – Shell script for Beacon Z measurements
 
 ### Klipper Configs & Macros
 
@@ -316,9 +318,14 @@ This project works with several external Klipper plugins:
 
 **Recommended:**
 
-- **[Shake&Tune](https://github.com/Frix-x/klippain-shaketune)** – For input shaper tuning  
-- **[TMC Autotune](https://github.com/andrewmcgr/klipper_tmc_autotune)** – For automatic TMC driver tuning  
+- **[kTAMV](https://github.com/TypQxQ/kTAMV)** – Camera-based XY calibration (primary method)
+- **[Shake&Tune](https://github.com/Frix-x/klippain-shaketune)** – For input shaper tuning
+- **[TMC Autotune](https://github.com/andrewmcgr/klipper_tmc_autotune)** – For automatic TMC driver tuning
 - **[Klipper LED Effect](https://github.com/julianschill/klipper-led_effect)** – For LED status effects
+
+**Optional:**
+
+- **[NUDGE](https://github.com/zruncho3d/nudge)** – Physical probe XY calibration (backup method)
 
 Install these according to their respective documentation before proceeding.
 
@@ -357,14 +364,14 @@ printer_data/config/ATOM-toolchanger-examples/
  ├─ macros.cfg
  ├─ mainsail.cfg
  ├─ printer_example.cfg
- ├─ shell_command.cfg
  ├─ variables.cfg
  └─ atom/
      ├─ T0.cfg … T5.cfg
      ├─ toolchanger.cfg
      ├─ toolchanger_macros.cfg
+     ├─ tool_calibration.cfg
      ├─ beacon.cfg
-     ├─ calibrate_offsets.cfg
+     ├─ beacon_diagnostics.cfg
      ├─ knomi.cfg
      └─ tc_led_effects.cfg
 ```
@@ -392,7 +399,7 @@ Keep the files where they are and include them from your `printer.cfg`:
 [include ATOM-toolchanger-examples/atom/T5.cfg]
 ```
 
-Use `macros.cfg`, `mainsail.cfg`, `shell_command.cfg` and `variables.cfg` as
+Use `macros.cfg`, `mainsail.cfg`, and `variables.cfg` as
 templates and copy pieces into your existing config layout as needed.
 
 #### Option B – move the files into your own layout (advanced users)
@@ -544,17 +551,22 @@ This project builds on work by many contributors in the Klipper toolchanger comm
 
 - [viesturz/klipper-toolchanger](https://github.com/viesturz/klipper-toolchanger) – Original implementation and core logic
 
+**Calibration Tools:**
+
+- **[kTAMV](https://github.com/TypQxQ/kTAMV)** by TypQxQ – Camera-based XY offset calibration using computer vision. kTAMV enables precise nozzle alignment through a USB camera and is the primary XY calibration method in this project. Licensed under GPL-3.0.
+- **[NUDGE](https://github.com/zruncho3d/nudge)** by Zruncho – Physical probe-based XY calibration. Used as backup method when camera is unavailable.
+
 **Hardware Design:**
 
-- **ATOM Toolhead:** Custom-designed by Alex at APDMachine (creator of the Reaper Toolhead)  
-- **Shuttle Mechanism:** Based on ClickChanger/Stealthchanger pin-and-bushing principles  
+- **ATOM Toolhead:** Custom-designed by Alex at APDMachine (creator of the Reaper Toolhead)
+- **Shuttle Mechanism:** Based on ClickChanger/Stealthchanger pin-and-bushing principles
 - **Dock Design:** Inspired by modular dock concepts, redesigned for this application
 
 **This Fork:**
 
-- Additional safety features, monitoring, and complete configuration by PrintStructor
+- Additional safety features, monitoring, batch calibration, per-tool babystepping, and complete configuration by PrintStructor
 
-This project is licensed under **GPL-3.0** (same as Klipper).  
+This project is licensed under **GPL-3.0** (same as Klipper and kTAMV).
 See [LICENSE](LICENSE) for full terms.
 
 ---
@@ -634,6 +646,6 @@ See [LICENSE](LICENSE) for complete terms.
 
 ---
 
-**Last updated:** 2025-11-20  
-**Version:** 1.0.0  
+**Last updated:** 2026-01-10
+**Version:** 1.1.0
 **Maintained by:** PrintStructor

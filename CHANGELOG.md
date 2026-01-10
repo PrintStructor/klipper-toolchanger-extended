@@ -17,6 +17,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2026-01-10
+
+### ✨ New Features
+
+#### Batch Calibration Macros
+- **`KTAMV_CALIBRATE_ALL_TOOLS_XY`** – Full XY calibration matrix using kTAMV camera
+  - Each tool used as initial tool, measures all others
+  - 6 × 5 = 30 offset measurements in one run
+  - Automatic camera setup per initial tool
+- **`BEACON_CALIBRATE_ALL_TOOLS_Z`** – Full Z calibration matrix using Beacon
+  - Each tool used as initial tool, measures all others
+  - 6 × 5 = 30 Z-offset measurements in one run
+  - Automatic heating to 150°C per tool
+
+#### Per-Tool Z Babystepping
+- **`SET_TOOL_Z_ADJUST`** – Live Z-offset adjustments during printing
+  - Adjustments stored in RAM (no SD card writes during print)
+  - Applied immediately if tool is currently active
+  - Works for ALL tools including initial/reference tool
+- **`SHOW_TOOL_Z_ADJUSTMENTS`** – Display current vs. calibrated offsets
+- **`SAVE_TOOL_Z_ADJUSTMENTS`** – Persist adjustments via SAVE_CONFIG
+- **`CHECK_TOOL_Z_ADJUSTMENTS`** – For PRINT_END integration
+
+#### Global Z-Offset
+- **`GLOBAL_Z_ADJUST`** – Adjust Z-offset for ALL tools equally
+  - Perfect for first-layer tuning across all tools
+  - `Z=+0.01` / `Z=-0.01` for fine adjustments
+  - `RESET=1` to return to 0.0
+
+#### kTAMV Integration (Camera-based XY Calibration)
+- Primary XY calibration method using computer vision
+- Integration with [kTAMV](https://github.com/TypQxQ/kTAMV) by TypQxQ
+- Step-by-step and batch calibration workflows
+- Automatic offset saving to printer.cfg
+
+### 📦 New Python Modules
+- **`tool_xy_calibration.py`** – XY offset saving for kTAMV integration
+  - `SAVE_TOOL_XY_OFFSET` – Manual XY offset save
+  - `KTAMV_AUTO_SAVE_OFFSET` – Auto-save from kTAMV measurements
+  - `SHOW_TOOL_XY_OFFSETS` – Display calibrated offsets
+- **`tool_z_adjust.py`** – Per-tool Z babystepping module
+  - Live adjustments without config writes
+  - Session tracking for unsaved changes
+  - Reset to calibrated values
+
+### 🔧 Improvements
+
+#### Initial Tool Handling
+- Initial tool now gets explicit 0.0 Z-offset saved during calibration
+- Enables proper babystepping for reference tool
+- Symmetric treatment of all tools (no special-casing T0)
+
+#### Calibration Workflows
+- Improved kTAMV workflow documentation
+- NUDGE remains as backup method when camera unavailable
+- Clearer separation between camera-based and probe-based methods
+
+### 📚 Documentation
+- Updated README with kTAMV credits and integration info
+- Added kTAMV to External Dependencies section
+- Updated example config structure (removed shell_command.cfg)
+- New calibration command reference in tool_calibration.cfg
+
+### 🗑️ Removed
+- `shell_command.cfg` – No longer needed (calibration uses native Python)
+- `calibrate_offsets.cfg` – Replaced by `tool_calibration.cfg`
+
+### 🙏 Credits
+- **kTAMV** by TypQxQ – Camera-based XY calibration (GPL-3.0)
+- **NUDGE** by Zruncho – Physical probe XY calibration (backup method)
+
+---
+
 ## [1.0.1] - 2025-11-26
 
 ### Fixed
@@ -253,6 +326,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
 
 ---
 
-[Unreleased]: https://github.com/PrintStructor/klipper-toolchanger-extended/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/PrintStructor/klipper-toolchanger-extended/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/PrintStructor/klipper-toolchanger-extended/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/PrintStructor/klipper-toolchanger-extended/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/PrintStructor/klipper-toolchanger-extended/releases/tag/v1.0.0

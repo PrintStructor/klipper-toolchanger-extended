@@ -337,6 +337,6 @@ They do not provide:
 ---
 
 **Last updated:** 2025-11-20  
-**Version:** 1.0.0
+**Version:** 1.1.0
 
 **Note:** This document focuses on technical functionality rather than promotional "success stories." The goal is to help users understand what these features actually do and set realistic expectations for their performance.

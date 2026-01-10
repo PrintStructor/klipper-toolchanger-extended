@@ -98,7 +98,8 @@ class Toolchanger:
         self.tool_numbers = []  # Ordered list of registered tool numbers.
         self.tool_names = []    # Tool names, in the same order as numbers.
         self.error_message = ''
-        self.calibration_mode = False
+        self.calibration_mode = False      # Z-offsets disabled (for Beacon + kTAMV)
+        self.xy_calibration_mode = False   # XY-offsets disabled (only for kTAMV)
         self.next_change_id = 1
         self.current_change_id = -1
         self.last_change_restore_position = None
@@ -156,9 +157,9 @@ class Toolchanger:
         self.gcode.register_command("RELOAD_TOOL_OFFSETS",
                                     self.cmd_RELOAD_TOOL_OFFSETS,
                                     desc=self.cmd_RELOAD_TOOL_OFFSETS_help)
-        self.gcode.register_command("_SET_CALIBRATION_MODE",
+        self.gcode.register_command("SET_CALIBRATION_MODE",
                                     self.cmd_SET_CALIBRATION_MODE,
-                                    desc="Internal: Enable/disable calibration mode")
+                                    desc="Enable/disable calibration mode (no Z-offsets during calibration)")
 
     # ==============================================================================
     #                          Detection Helpers
@@ -252,29 +253,35 @@ class Toolchanger:
     #                                Lifecycle Hooks
     # ==============================================================================
 
-    def _handle_babystep(self, z_adjust):
-        """Handle baby-stepping adjustments for all tools."""
-        try:
-            globals_macro = self.printer.lookup_object('gcode_macro globals')
-            current_offset = globals_macro.variables.get('global_z_offset', 0.06)
-            new_offset = current_offset + z_adjust
-            globals_macro.variables['global_z_offset'] = new_offset
-            self.gcode.respond_info(
-                "Updated global Z-offset to: %.3f (adjusted by %.3f)" %
-                (new_offset, z_adjust))
-
-            if self.initial_tool:
-                for tool_num in self.tool_numbers:
-                    if tool_num != self.initial_tool.tool_number:
-                        tool = self.tools[tool_num]
-                        if tool.tool_number in self.initial_tool.z_offsets:
-                            tool_rel_offset = self.initial_tool.z_offsets[tool.tool_number]
-                            new_total_offset = tool_rel_offset + new_offset
-                            self.gcode.respond_info(
-                                "Updated T%d offset to: %.3f" %
-                                (tool_num, new_total_offset))
-        except Exception as e:
-            self.gcode.respond_info("Error updating global Z-offset: %s" % str(e))
+    # NOTE: _handle_babystep is DEPRECATED - Z_ADJUST is now intercepted by
+    # SET_GCODE_OFFSET macro override in calibrate_offsets.cfg which redirects
+    # to SET_TOOL_Z_ADJUST for per-tool adjustments.
+    # Global adjustments are handled by GLOBAL_Z_ADJUST macro.
+    # Kept commented for reference / potential future use.
+    #
+    # def _handle_babystep(self, z_adjust):
+    #     """Handle baby-stepping adjustments for all tools."""
+    #     try:
+    #         globals_macro = self.printer.lookup_object('gcode_macro globals')
+    #         current_offset = globals_macro.variables.get('global_z_offset', 0.06)
+    #         new_offset = current_offset + z_adjust
+    #         globals_macro.variables['global_z_offset'] = new_offset
+    #         self.gcode.respond_info(
+    #             "Updated global Z-offset to: %.3f (adjusted by %.3f)" %
+    #             (new_offset, z_adjust))
+    #
+    #         if self.initial_tool:
+    #             for tool_num in self.tool_numbers:
+    #                 if tool_num != self.initial_tool.tool_number:
+    #                     tool = self.tools[tool_num]
+    #                     if tool.tool_number in self.initial_tool.z_offsets:
+    #                         tool_rel_offset = self.initial_tool.z_offsets[tool.tool_number]
+    #                         new_total_offset = tool_rel_offset + new_offset
+    #                         self.gcode.respond_info(
+    #                             "Updated T%d offset to: %.3f" %
+    #                             (tool_num, new_total_offset))
+    #     except Exception as e:
+    #         self.gcode.respond_info("Error updating global Z-offset: %s" % str(e))
 
     def _handle_home_rails_begin(self, homing_state, rails):
         if self.initialize_on == INIT_ON_HOME and self.status == STATUS_UNINITALIZED:
@@ -501,11 +508,13 @@ class Toolchanger:
         gcmd.respond_info("Active tool: %s (T%d)" % (self.active_tool.name, self.active_tool.tool_number))
         gcmd.respond_info("You can now RESUME the print!")
 
-    cmd_SET_GCODE_OFFSET_help = "Overrides default SET_GCODE_OFFSET to handle global baby-stepping"
+    # NOTE: Z_ADJUST handling removed - now intercepted by SET_GCODE_OFFSET macro
+    # in calibrate_offsets.cfg which redirects to SET_TOOL_Z_ADJUST (per-tool).
+    # This override is kept to maintain the Python-level registration chain.
+    cmd_SET_GCODE_OFFSET_help = "Pass-through for SET_GCODE_OFFSET (Z_ADJUST handled by macro)"
     def cmd_SET_GCODE_OFFSET(self, gcmd):
-        z_adjust = gcmd.get_float('Z_ADJUST', None)
-        if z_adjust is not None:
-            self._handle_babystep(z_adjust)
+        # Z_ADJUST is intercepted by macro before reaching here
+        # Simply pass through to the base command
         self.base_set_gcode_offset(gcmd)
 
     def cmd_RESET_INITIAL_TOOL(self, gcmd):
@@ -572,13 +581,30 @@ class Toolchanger:
         self.gcode.respond_info(f"✅ Set T{new_initial_num} as new initial tool ({loaded_count} offsets available)")
 
     def cmd_SET_CALIBRATION_MODE(self, gcmd):
-        """Enable or disable calibration mode (disables Z-offset application)."""
+        """Enable or disable calibration mode.
+
+        Parameters:
+            ENABLE=1/0  - Enable/disable Z-offset calibration mode
+            XY=1/0      - Also disable XY-offsets (for kTAMV calibration)
+
+        Usage:
+            SET_CALIBRATION_MODE ENABLE=1        # Beacon Z-cal: XY on, Z off
+            SET_CALIBRATION_MODE ENABLE=1 XY=1   # kTAMV XY-cal: XY off, Z off
+            SET_CALIBRATION_MODE ENABLE=0        # Normal mode: XY on, Z on
+        """
         enable = gcmd.get_int('ENABLE', 0)
+        xy_disable = gcmd.get_int('XY', 0)
+
         self.calibration_mode = (enable == 1)
+        self.xy_calibration_mode = (enable == 1 and xy_disable == 1)
+
         if self.calibration_mode:
-            self.gcode.respond_info("⚙️ Calibration mode ENABLED - Z-offsets will NOT be applied during tool changes")
+            if self.xy_calibration_mode:
+                self.gcode.respond_info("⚙️ Calibration mode ENABLED - XY+Z offsets disabled (kTAMV mode)")
+            else:
+                self.gcode.respond_info("⚙️ Calibration mode ENABLED - Z-offsets disabled (Beacon mode)")
         else:
-            self.gcode.respond_info("✅ Calibration mode DISABLED - normal Z-offset behavior restored")
+            self.gcode.respond_info("✅ Calibration mode DISABLED - normal XY+Z offset behavior restored")
 
     cmd_TEST_TOOL_DOCKING_help = "Unselect active tool and select it again"
     def cmd_TEST_TOOL_DOCKING(self, gcmd):
@@ -612,7 +638,7 @@ class Toolchanger:
             if select_tool:
                 self._configure_toolhead_for_tool(select_tool)
                 self.run_gcode('after_change_gcode', select_tool.after_change_gcode, extra_context)
-                self._set_tool_gcode_offset(select_tool, 0.0)
+                self._set_tool_gcode_offset(select_tool)
 
             if self.require_tool_present and self.active_tool is None:
                 self._process_error(
@@ -657,41 +683,18 @@ class Toolchanger:
 
             gcode_status = self.gcode_move.get_status()
             gcode_position = gcode_status['gcode_position']
-            current_z_offset = gcode_status['homing_origin'][2]
-
-            # Calculate extra_z_offset (baby-stepping, Z-tuning, etc.)
-            # We must account for BOTH tool offset AND global offset!
-            # Otherwise the global offset gets incorrectly treated as "extra"
-            try:
-                globals_macro = self.printer.lookup_object('gcode_macro globals')
-                global_offset = globals_macro.variables.get('global_z_offset', 0.06)
-            except:
-                global_offset = 0.06  # Fallback to default
-
-            # CRITICAL: Use the SAME offset source as in the apply logic (line 992)!
-            # We must use initial_tool.z_offsets, not active_tool.gcode_z_offset
-            if self.active_tool == self.initial_tool:
-                active_tool_offset = 0.0
-            elif self.initial_tool and hasattr(self.initial_tool, 'z_offsets'):
-                active_tool_offset = self.initial_tool.z_offsets.get(self.active_tool.tool_number, 0.0)
-            else:
-                active_tool_offset = 0.0
-
-            expected_offset = active_tool_offset + global_offset
-            extra_z_offset = current_z_offset - expected_offset
 
             self.last_change_gcode_position = gcode_position
             self.last_change_start_position = self._position_to_xyz(gcode_position, 'xyz')
             self.last_change_restore_position = self._position_to_xyz(gcode_position, restore_axis)
             self.last_change_restore_axis = restore_axis
-            self.last_change_extra_z_offset = extra_z_offset
             self.last_change_pickup_tool = tool
 
             extra_context = {
                 'dropoff_tool': self.active_tool.name if self.active_tool else None,
                 'pickup_tool': tool.name if tool else None,
-                'start_position': self._position_with_tool_offset(gcode_position, 'xyz', tool, extra_z_offset),
-                'restore_position': self._position_with_tool_offset(gcode_position, restore_axis, tool, extra_z_offset),
+                'start_position': self._position_with_tool_offset(gcode_position, 'xyz', tool),
+                'restore_position': self._position_with_tool_offset(gcode_position, restore_axis, tool),
             }
 
             self.gcode.run_script_from_command("SAVE_GCODE_STATE NAME=_toolchange_state")
@@ -779,7 +782,7 @@ class Toolchanger:
 
             # NOW set the correct Z / XY offsets AFTER RESTORE_GCODE_STATE
             if tool is not None:
-                self._set_tool_gcode_offset(tool, extra_z_offset)
+                self._set_tool_gcode_offset(tool)
 
             # After-change - now with correct offsets active
             if tool:
@@ -828,7 +831,7 @@ class Toolchanger:
         self._restore_axis(self.last_change_gcode_position, 'xyz', tool)
         self.gcode.run_script_from_command(
             "RESTORE_GCODE_STATE NAME=_toolchange_state MOVE=0")
-        self._set_tool_gcode_offset(tool, self.last_change_extra_z_offset)
+        self._set_tool_gcode_offset(tool)
 
         # CRITICAL: Properly resume after successful recovery!
         # We already restored position via _restore_axis(), so we must NOT call RESUME_BASE
@@ -977,35 +980,35 @@ class Toolchanger:
         if self.active_tool:
             self.active_tool.activate()
 
-    def _set_tool_gcode_offset(self, tool, extra_z_offset):
+    def _set_tool_gcode_offset(self, tool):
+        """Apply Z and XY offsets for a tool."""
         if tool is None:
             return
 
         try:
             globals_macro = self.printer.lookup_object('gcode_macro globals')
-            global_offset = globals_macro.variables.get('global_z_offset', 0.06)
+            global_offset = globals_macro.variables.get('global_z_offset', 0.0)
 
             # --- Z-Offset Logic ---
             # During calibration mode, do NOT apply Z-offsets (they are being measured)
             if self.calibration_mode:
                 self.gcode.run_script_from_command('SET_GCODE_OFFSET Z=0 ABSOLUTE=1')
                 self.gcode.respond_info("⚙️ Calibration mode: Z-offset set to 0 for T%d" % tool.tool_number)
-            elif tool == self.initial_tool:
-                # Initial tool: only global offset
-                total_offset = global_offset + extra_z_offset
-                self.gcode.respond_info("Restored initial tool (T%d) with global offset: %.3f" %
-                                        (tool.tool_number, total_offset))
-                self.gcode.run_script_from_command('SET_GCODE_OFFSET Z=%.3f ABSOLUTE=1' % (total_offset,))
             else:
-                # Other tools: tool offset + global offset
+                # All tools treated equally - get z_offset from z_offsets dictionary
+                # Initial tool also has an entry (defaults to 0, can be adjusted)
                 z_offset = self.initial_tool.z_offsets.get(tool.tool_number, 0.0) if self.initial_tool else 0.0
-                total_offset = z_offset + global_offset + extra_z_offset
-                self.gcode.respond_info("Setting Z-offset for T%d: tool=%.3f, global=%.3f, extra=%.3f, total=%.3f" %
-                                        (tool.tool_number, z_offset, global_offset, extra_z_offset, total_offset))
+                total_offset = z_offset + global_offset
+                self.gcode.respond_info("T%d Z-offset: tool=%.3f, global=%.3f, total=%.3f" %
+                                        (tool.tool_number, z_offset, global_offset, total_offset))
                 self.gcode.run_script_from_command('SET_GCODE_OFFSET Z=%.3f ABSOLUTE=1' % (total_offset,))
 
             # --- XY-Offset Logic ---
-            if tool == self.initial_tool:
+            # In XY calibration mode (kTAMV), do NOT apply XY-offsets
+            if self.xy_calibration_mode:
+                self.gcode.run_script_from_command("SET_GCODE_OFFSET X=0 Y=0 ABSOLUTE=1")
+                self.gcode.respond_info("⚙️ XY calibration mode: XY-offset set to 0 for T%d" % tool.tool_number)
+            elif tool == self.initial_tool:
                 # Initial tool: XY offset = 0
                 self.gcode.run_script_from_command("SET_GCODE_OFFSET X=0 Y=0 ABSOLUTE=1")
                 self.gcode.respond_info("Initial tool T%d: setting reference XY-offset to 0" % tool.tool_number)
@@ -1040,7 +1043,7 @@ class Toolchanger:
             result[INDEX_TO_XYZ[index]] = position[index]
         return result
 
-    def _position_with_tool_offset(self, position, axis, tool, extra_z_offset=0.0):
+    def _position_with_tool_offset(self, position, axis, tool):
         result = {}
         for i in axis:
             index = XYZ_TO_INDEX[i]
@@ -1048,7 +1051,7 @@ class Toolchanger:
             if tool:
                 if index == 0: v += tool.gcode_x_offset
                 if index == 1: v += tool.gcode_y_offset
-                if index == 2: v += tool.gcode_z_offset + extra_z_offset
+                if index == 2: v += tool.gcode_z_offset
             result[INDEX_TO_XYZ[index]] = v
         return result
 

@@ -182,11 +182,11 @@ else
               ;;
 
             # Files that belong to the ATOM/toolchanger block
-            T*.cfg|calibrate_offsets.cfg|toolchanger.cfg|toolchanger_macros.cfg|knomi.cfg|tc_led_effects.cfg|beacon.cfg)
+            T*.cfg|tool_calibration.cfg|toolchanger.cfg|toolchanger_macros.cfg|knomi.cfg|tc_led_effects.cfg|beacon.cfg|beacon_diagnostics.cfg)
               dest="${EXAMPLES_TARGET_ATOM}/${bn}"
               ;;
 
-            # Other files (macros.cfg, mainsail.cfg, shell_command.cfg, etc.)
+            # Other files (macros.cfg, mainsail.cfg, variables.cfg, etc.)
             *)
               dest="${EXAMPLES_TARGET_BASE}/${bn}"
               ;;

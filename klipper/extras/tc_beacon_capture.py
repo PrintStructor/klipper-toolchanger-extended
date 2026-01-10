@@ -85,8 +85,8 @@ def main():
     
     try:
         tool_number = int(sys.argv[1])
-        if not 0 <= tool_number <= 5:
-            print(f"ERROR: Tool number must be between 0 and 5, got {tool_number}", file=sys.stderr)
+        if tool_number < 0:
+            print(f"ERROR: Tool number must be >= 0, got {tool_number}", file=sys.stderr)
             sys.exit(1)
     except ValueError:
         print(f"ERROR: Invalid tool number: {sys.argv[1]}", file=sys.stderr)
