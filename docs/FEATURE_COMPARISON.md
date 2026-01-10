@@ -46,9 +46,12 @@ This document compares the features of klipper-toolchanger-extended with other K
 | Heater shutoff on tool loss | ❌ | ❌ | ✅ |
 | **Calibration** | | | |
 | Manual XY calibration | ✅ | ✅ | ✅ |
-| Guided XY calibration | ❌ | ❌ | ✅ |
+| Guided XY calibration (NUDGE) | ❌ | ❌ | ✅ |
+| Camera-based XY calibration (kTAMV) | ❌ | ❌ | ✅ |
 | Manual Z calibration | ✅ | ✅ | ✅ |
 | Guided Z calibration | ❌ | ❌ | ✅ |
+| Batch calibration (full matrix) | ❌ | ❌ | ✅ |
+| Per-tool Z babystepping | ❌ | ❌ | ✅ |
 | Per-tool input shaper | ❌ | ❌ | ✅ |
 | **Configuration** | | | |
 | Example configs | ⚠️ Minimal | ⚠️ Basic | ✅ Complete |
@@ -105,17 +108,31 @@ This document compares the features of klipper-toolchanger-extended with other K
 
 **viesturz/TypQxQ:** Provides manual calibration procedures - measure offsets with calipers or test prints, edit config files manually, restart Klipper, test results.
 
-**This fork:** Adds command-driven calibration:
-- `NUDGE_FIND_TOOL_OFFSETS` - Interactive XY calibration with live adjustment
+**This fork:** Adds command-driven calibration with multiple methods:
+
+**XY Calibration:**
+- **kTAMV** (primary) - Camera-based calibration using computer vision
+- **NUDGE** (backup) - Physical probe with interactive nudge-to-align workflow
+
+**Z Calibration:**
 - `MEASURE_TOOL_Z_OFFSETS` - Automated Z calibration using Beacon probe
-- Results saved directly via SAVE_CONFIG
-- No manual file editing required
+
+**Batch Calibration (v1.1.0+):**
+- `KTAMV_CALIBRATE_ALL_TOOLS_XY` - Full XY matrix (each tool as reference)
+- `BEACON_CALIBRATE_ALL_TOOLS_Z` - Full Z matrix (each tool as reference)
+- For 6 tools: 6×5 = 30 measurements per axis for maximum accuracy
+
+**Per-Tool Z Babystepping (v1.1.0+):**
+- `SET_TOOL_Z_ADJUST` - Live Z adjustment during printing
+- `GLOBAL_Z_ADJUST` - Adjust all tools equally
+- `SAVE_TOOL_Z_ADJUSTMENTS` - Persist changes after print
 
 **Time comparison:**
 - Manual calibration: ~45-60 minutes per tool (measure, edit, test, repeat)
 - Guided calibration: ~5-10 minutes per tool (run command, verify, done)
+- Batch calibration: ~20-30 minutes total for all 6 tools (fully automated)
 
-For 6 tools, this reduces initial calibration from ~4-6 hours to ~30-60 minutes total.
+For 6 tools, this reduces initial calibration from ~4-6 hours to ~30 minutes total.
 
 ---
 

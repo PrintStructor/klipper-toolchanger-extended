@@ -194,44 +194,43 @@ without mechanical issues.
 
 ---
 
-## 7. XY Calibration with `NUDGE_FIND_TOOL_OFFSETS`
+## 7. XY Calibration
 
-Once basic pickup and dropoff work:
+Once basic pickup and dropoff work, you have two calibration methods:
 
-1. Home:
+### Option A: kTAMV (Camera-based) – Recommended
 
-   ```gcode
-   G28
-   ```
-
-2. Set your **reference tool** (usually T0):
-
-   ```gcode
-   SET_INITIAL_TOOL TOOL=0
-   ```
-
-3. Run the XY calibration helper:
-
-   ```gcode
-   NUDGE_FIND_TOOL_OFFSETS INITIAL_TOOL=0
-   ```
-
-This macro will guide you through aligning the tools in XY relative to your
-reference tool. Follow the on‑screen / console instructions carefully.
-
-When you are satisfied with the alignment, run:
+If you have kTAMV installed ([kTAMV by TypQxQ](https://github.com/TypQxQ/kTAMV)):
 
 ```gcode
-SAVE_CONFIG
+G28
+SET_INITIAL_TOOL TOOL=0
+KTAMV_CALIBRATE_ALL_TOOLS_XY   # Full batch calibration
 ```
 
-Klipper will write the computed offsets to your config file.
+This uses computer vision to automatically measure all XY offsets.
 
-> 📌 Full details in: `CALIBRATION.md` → *XY Calibration*
+### Option B: NUDGE (Physical probe)
+
+If you don't have kTAMV, use the manual nudge workflow:
+
+```gcode
+G28
+SET_INITIAL_TOOL TOOL=0
+NUDGE_FIND_TOOL_OFFSETS INITIAL_TOOL=0
+```
+
+This guides you through aligning each tool visually over a reference mark.
 
 ---
 
-## 8. Z Calibration with `MEASURE_TOOL_Z_OFFSETS`
+When calibration completes, offsets are saved automatically via `SAVE_CONFIG`.
+
+> 📌 Full details in: `CALIBRATION.md` → *XY Calibration* and *Batch Calibration*
+
+---
+
+## 8. Z Calibration
 
 After XY is dialed in:
 
@@ -240,24 +239,33 @@ After XY is dialed in:
 2. Make sure your reference tool T0 has a correct Z offset via your normal
    probe‑based procedure.
 
-3. Run:
+3. Run Z calibration:
 
-   ```gcode
-   G28
-   SET_INITIAL_TOOL TOOL=0
-   MEASURE_TOOL_Z_OFFSETS INITIAL_TOOL=0
-   ```
-
-The macro will use your probe to measure each tool and compute its Z offset
-relative to the reference.
-
-When it finishes, run:
+### Option A: Batch Z Calibration (Recommended)
 
 ```gcode
-SAVE_CONFIG
+G28
+SET_INITIAL_TOOL TOOL=0
+BEACON_CALIBRATE_ALL_TOOLS_Z   # Full matrix calibration
 ```
 
-> 📌 Full details in: `CALIBRATION.md` → *Z Calibration*
+This uses each tool as reference and averages results for best accuracy.
+
+### Option B: Single-Reference Calibration
+
+```gcode
+G28
+SET_INITIAL_TOOL TOOL=0
+MEASURE_TOOL_Z_OFFSETS INITIAL_TOOL=0
+```
+
+The macro will use your probe to measure each tool relative to T0.
+
+---
+
+Offsets are saved automatically via `SAVE_CONFIG`.
+
+> 📌 Full details in: `CALIBRATION.md` → *Z Calibration* and *Batch Calibration*
 
 ---
 
@@ -293,8 +301,13 @@ Watch this print in full. If everything looks good:
 - Study **`CALIBRATION.md`** for deeper understanding of XY/Z workflows  
 - Explore **`examples/atom-tc-6tool/README.md`** for the full reference setup
 
-Once you’re comfortable, you can start:
+Once you're comfortable, you can start:
 
+- Using **per-tool Z babystepping** during prints (`SET_TOOL_Z_ADJUST`)
 - Tuning per‑tool input shaper
 - Integrating KNOMI / LED status
 - Refining your slicer profiles for multi‑tool printing
+
+> 💡 **Tip:** During prints, use `SET_TOOL_Z_ADJUST TOOL=n Z=±0.02` to fine-tune
+> individual tool Z-offsets without stopping. Save with `SAVE_TOOL_Z_ADJUSTMENTS`
+> after a successful print.

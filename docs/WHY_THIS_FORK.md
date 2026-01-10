@@ -17,10 +17,23 @@ This is an extension of [viesturz/klipper-toolchanger](https://github.com/viestu
 - LED status integration
 
 **3. Guided Calibration**
-- NUDGE probe for XY offset calibration
+- **kTAMV** camera-based XY calibration (primary method)
+- NUDGE probe for XY offset calibration (backup method)
 - Beacon contact probe for Z offset calibration
+- **Batch calibration** for full offset matrix in one run
 - Automated measurement workflows
 - Configuration saved via SAVE_CONFIG
+
+**4. Per-Tool Z Babystepping (v1.1.0+)**
+- Live Z-offset adjustments during printing
+- Global adjustment affecting all tools equally
+- RAM-based storage (no SD writes during print)
+- Save adjustments after successful prints
+
+**5. Flexible Tool Count**
+- Dynamic tool detection (supports 7+ tools)
+- Any tool can be the initial reference tool
+- Not limited to T0 as reference
 
 ---
 
@@ -43,6 +56,10 @@ This is an excellent foundation for experimentation and custom implementations.
 - **Complete example configuration** - All macros, safety checks, and settings
 - **Hardware-specific documentation** - ATOM toolheads, CPAP cooling, wiring
 - **Calibration workflows** - Command-driven offset measurement and storage
+- **kTAMV integration** - Camera-based XY calibration as primary method
+- **Batch calibration** - Full matrix calibration (all tools as reference)
+- **Per-tool Z babystepping** - Live adjustments during printing
+- **Dynamic tool count** - Supports 7+ tools, not hardcoded to 6
 
 ---
 

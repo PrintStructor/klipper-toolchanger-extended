@@ -25,7 +25,9 @@ It's an enhanced fork of the original klipper-toolchanger by viesturz, featuring
 - **ATOM toolhead** integration
 - **Per-tool input shaper**
 - **LED effects** and KNOMI display support
-- **Beacon + NUDGE** calibration integration
+- **kTAMV + NUDGE** calibration integration
+- **Batch calibration** for full offset matrix (v1.1.0+)
+- **Per-tool Z babystepping** during prints (v1.1.0+)
 
 **Based on:** [viesturz/klipper-toolchanger](https://github.com/viesturz/klipper-toolchanger)
 
@@ -49,13 +51,16 @@ It's an enhanced fork of the original klipper-toolchanger by viesturz, featuring
 
 ### How many tools can I use?
 
-**Minimum:** 2 tools (for multi-tool functionality)  
+**Minimum:** 2 tools (for multi-tool functionality)
 **Maximum:** Theoretically unlimited
 
 **Practical limits:**
 - **2-3 tools:** Simple setups, limited dock space
 - **4-6 tools:** Sweet spot (ATOM standard)
-- **7+ tools:** Possible but requires careful planning
+- **7+ tools:** Fully supported since v1.1.0
+
+**v1.1.0+ Dynamic Tool Count:**
+The code now dynamically detects all configured tools instead of being hardcoded to 6. Users have successfully run 7+ tool setups.
 
 **Considerations for many tools:**
 - Dock space availability
@@ -390,6 +395,73 @@ tar -czf ~/config_backup_$(date +%Y%m%d).tar.gz ~/printer_data/config/
 - Higher accuracy
 - Repeatable results
 - Faster
+
+---
+
+### What is kTAMV and how does it compare to NUDGE?
+
+**kTAMV** ([by TypQxQ](https://github.com/TypQxQ/kTAMV)) uses a camera and computer vision to measure nozzle positions.
+
+| Method | kTAMV | NUDGE |
+|--------|-------|-------|
+| **Hardware** | USB camera | Physical probe |
+| **Accuracy** | Very high | High |
+| **Speed** | Fast (automated) | Slower (manual nudging) |
+| **Ease** | Fully automatic | Semi-manual |
+| **Setup** | Camera mounting, lighting | Probe installation |
+
+**Recommendation:**
+- **kTAMV** as primary method (faster, fully automated)
+- **NUDGE** as backup when camera unavailable
+
+---
+
+### What is batch calibration?
+
+**Batch calibration** (v1.1.0+) measures offsets using each tool as reference, then averages results for maximum accuracy.
+
+**Commands:**
+```gcode
+KTAMV_CALIBRATE_ALL_TOOLS_XY   # Full XY matrix
+BEACON_CALIBRATE_ALL_TOOLS_Z   # Full Z matrix
+```
+
+**How it works:**
+- 6 tools → 6×5 = 30 measurements per axis
+- Each tool is used as reference in sequence
+- Results are averaged to eliminate per-tool bias
+- More accurate than single-reference calibration
+
+**When to use:**
+- Initial setup
+- Periodic recalibration
+- After mechanical changes to multiple tools
+
+---
+
+### How do I adjust Z during a print?
+
+**Per-tool Z babystepping** (v1.1.0+) allows live adjustments without stopping:
+
+```gcode
+# Adjust current tool
+SET_TOOL_Z_ADJUST Z=+0.02
+
+# Adjust specific tool
+SET_TOOL_Z_ADJUST TOOL=3 Z=-0.01
+
+# Adjust all tools equally
+GLOBAL_Z_ADJUST Z=+0.02
+
+# Save after successful print
+SAVE_TOOL_Z_ADJUSTMENTS
+```
+
+**Key features:**
+- RAM-based (no SD card writes during print)
+- Works for ALL tools including reference tool
+- Changes apply immediately
+- Safe to use mid-print
 
 ---
 
