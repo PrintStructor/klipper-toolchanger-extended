@@ -187,16 +187,24 @@ class Tool:
             # CRITICAL: Only trigger if a print is actually running or paused!
             # Prevents false alarms when manually changing tools after:
             # - Print completion, CANCEL_PRINT, or manual tool changes
+            # - PRINT_START initialization phase (Beacon calibrate, etc.)
             virtual_sdcard = self.printer.lookup_object('virtual_sdcard', None)
             pause_resume = self.printer.lookup_object('pause_resume', None)
-            is_printing = (virtual_sdcard and virtual_sdcard.is_active()) or \
-                          (pause_resume and pause_resume.is_paused)
+
+            # Check PRINT_START.printing flag to distinguish actual printing from init phase
+            # virtual_sdcard.is_active() is TRUE during PRINT_START, but printing=False until ready
+            print_start_macro = self.printer.lookup_object('gcode_macro PRINT_START', None)
+            actually_printing = False
+            if print_start_macro:
+                actually_printing = print_start_macro.variables.get('printing', False)
+
+            is_printing = actually_printing or (pause_resume and pause_resume.is_paused)
 
             if (self == self.toolchanger.active_tool and
                 self.toolchanger.status == toolchanger.STATUS_READY and
                 old_state == toolchanger.DETECT_PRESENT and
                 self.detect_state != toolchanger.DETECT_PRESENT and
-                is_printing):  # ← Only trigger during active print or pause!
+                is_printing):  # ← Only trigger during actual printing, not init!
                 # Tool has dropped during print! Call safety handler
                 self._handle_tool_loss()
         except Exception as e:

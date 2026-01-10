@@ -129,6 +129,63 @@ else
 fi
 
 ###############################################################################
+# Optional: Install improved kTAMV detection
+###############################################################################
+
+KTAMV_PATH="${KTAMV_PATH:-${HOME}/kTAMV}"
+KTAMV_SRC="${INSTALL_PATH}/kTAMV/server"
+
+echo
+info "kTAMV Detection Improvements"
+
+if [[ -d "${KTAMV_PATH}/server" ]]; then
+  if [[ -f "${KTAMV_SRC}/ktamv_server_dm.py" ]]; then
+    echo
+    read -r -p "[kTAMV] Install improved nozzle detection? (CLAHE, HoughCircles fallback) [y/N] " KTAMV_REPLY
+    case "${KTAMV_REPLY}" in
+      [yY][eE][sS]|[yY])
+        # Backup original if not already backed up
+        if [[ ! -f "${KTAMV_PATH}/server/ktamv_server_dm.py.original" ]]; then
+          cp "${KTAMV_PATH}/server/ktamv_server_dm.py" "${KTAMV_PATH}/server/ktamv_server_dm.py.original"
+          info "Backed up original detection to ktamv_server_dm.py.original"
+        fi
+
+        # Copy improved detection
+        cp "${KTAMV_SRC}/ktamv_server_dm.py" "${KTAMV_PATH}/server/ktamv_server_dm.py"
+        info "Installed improved kTAMV detection"
+
+        # Restart kTAMV if running
+        if pgrep -f "ktamv_server.py" >/dev/null 2>&1; then
+          info "Restarting kTAMV server..."
+          pkill -f "ktamv_server.py" || true
+          sleep 2
+          # Try to find the python environment
+          if [[ -f "${HOME}/ktamv-env/bin/python" ]]; then
+            nohup "${HOME}/ktamv-env/bin/python" "${KTAMV_PATH}/server/ktamv_server.py" --port 8085 > "${HOME}/ktamv.log" 2>&1 &
+            sleep 2
+            if pgrep -f "ktamv_server.py" >/dev/null 2>&1; then
+              info "kTAMV server restarted successfully"
+            else
+              warn "Failed to restart kTAMV server. Check ~/ktamv.log"
+            fi
+          else
+            warn "Could not find kTAMV Python environment. Please restart kTAMV manually."
+          fi
+        fi
+        ;;
+      *)
+        info "Skipping kTAMV detection improvements."
+        ;;
+    esac
+  else
+    warn "kTAMV improvements not found in repository."
+  fi
+else
+  info "kTAMV not found at ${KTAMV_PATH}. Skipping detection improvements."
+  info "If kTAMV is installed elsewhere, set KTAMV_PATH before running this script."
+fi
+
+###############################################################################
 # Optional: copy example configs into Mainsail config dir
 ###############################################################################
 
