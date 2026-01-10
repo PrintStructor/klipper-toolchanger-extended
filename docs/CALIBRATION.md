@@ -5,6 +5,8 @@ This document explains how to calibrate a multi‑tool printer using
 
 - XY alignment between tools
 - Z offsets for all tools
+- Batch calibration for full offset matrix (v1.1.0+)
+- Per-tool Z babystepping during prints (v1.1.0+)
 - When and how to re‑calibrate
 
 The examples assume:
@@ -22,9 +24,10 @@ The examples assume:
 The ATOM implementation uses enhanced calibration methods:
 - **kTAMV** (camera-based XY calibration) - primary method
 - **NUDGE** (physical probe) - backup method
-- **BEACON_CALIBRATE_Z** - specialized Z calibration macro
+- **Batch calibration** - full matrix XY/Z calibration in one run
+- **Per-tool babystepping** - live Z adjustments during prints
 
-This generic guide covers the standard NUDGE-based workflow for all other printers.
+This generic guide covers the standard workflow for all printers.
 
 ---
 
@@ -308,7 +311,151 @@ The simplest verification is a **multi‑tool first layer test**:
 
 ---
 
-## 6. When to Re‑Calibrate
+## 6. Batch Calibration (v1.1.0+)
+
+For comprehensive calibration, v1.1.0 introduces **batch calibration macros** that perform a full calibration matrix in one run.
+
+### 6.1. XY Batch Calibration – `KTAMV_CALIBRATE_ALL_TOOLS_XY`
+
+This macro uses **kTAMV** (camera-based calibration) to measure XY offsets for all tools:
+
+```gcode
+KTAMV_CALIBRATE_ALL_TOOLS_XY
+```
+
+**What it does:**
+
+- Uses each tool as initial/reference tool in sequence
+- Measures all other tools relative to it
+- For 6 tools: 6 × 5 = 30 offset measurements
+- Averages results for highest accuracy
+- Automatically saves offsets via `SAVE_CONFIG`
+
+**Prerequisites:**
+
+- kTAMV installed and configured ([kTAMV by TypQxQ](https://github.com/TypQxQ/kTAMV))
+- Camera positioned to view nozzle tip
+- All tools capable of reliable pickup/dropoff
+
+**When to use:**
+
+- Initial setup of a new toolchanger
+- After mechanical changes to multiple tools
+- Periodic recalibration for best accuracy
+
+---
+
+### 6.2. Z Batch Calibration – `BEACON_CALIBRATE_ALL_TOOLS_Z`
+
+This macro performs a full Z-offset calibration matrix using Beacon:
+
+```gcode
+BEACON_CALIBRATE_ALL_TOOLS_Z
+```
+
+**What it does:**
+
+- Uses each tool as initial/reference tool in sequence
+- Measures Z-offset for all other tools relative to it
+- For 6 tools: 6 × 5 = 30 Z-offset measurements
+- Averages results for highest accuracy
+- Automatically saves offsets via `SAVE_CONFIG`
+
+**Prerequisites:**
+
+- Beacon probe installed and calibrated
+- All tools heated to print temperature
+- Bed at print temperature
+
+**When to use:**
+
+- After XY calibration is complete
+- After nozzle changes on multiple tools
+- Periodic recalibration for consistent first layers
+
+---
+
+## 7. Per-Tool Z Babystepping (v1.1.0+)
+
+During printing, you may notice that individual tools need slight Z adjustments. Instead of stopping and recalibrating, use **per-tool Z babystepping**.
+
+### 7.1. Live Z Adjustment – `SET_TOOL_Z_ADJUST`
+
+Adjust Z-offset for a specific tool during printing:
+
+```gcode
+# Adjust current tool
+SET_TOOL_Z_ADJUST Z=+0.02
+
+# Adjust specific tool
+SET_TOOL_Z_ADJUST TOOL=3 Z=-0.01
+
+# Reset tool to calibrated value
+SET_TOOL_Z_ADJUST TOOL=2 RESET=1
+```
+
+**Parameters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `TOOL=n` | Tool number (0-5). Default: current tool |
+| `Z=±value` | Offset adjustment in mm (positive = higher) |
+| `RESET=1` | Reset to original calibrated offset |
+
+**Key features:**
+
+- Adjustments are stored in **RAM only** (no SD card writes during print)
+- Changes apply immediately to the specified tool
+- Works for ALL tools including the initial/reference tool
+- Safe to use mid-print without pausing
+
+---
+
+### 7.2. Global Z Adjustment – `GLOBAL_Z_ADJUST`
+
+Adjust Z-offset for **all tools equally** at once:
+
+```gcode
+# Move all tools 0.02mm higher
+GLOBAL_Z_ADJUST Z=+0.02
+
+# Move all tools 0.01mm lower
+GLOBAL_Z_ADJUST Z=-0.01
+```
+
+**When to use:**
+
+- First layer is consistently too high/low across all tools
+- Bed temperature change affecting overall Z height
+- Quick adjustment without per-tool tuning
+
+---
+
+### 7.3. Saving Adjustments – `SAVE_TOOL_Z_ADJUSTMENTS`
+
+After the print completes successfully, save the adjustments permanently:
+
+```gcode
+SAVE_TOOL_Z_ADJUSTMENTS
+```
+
+**What it does:**
+
+- Writes current Z adjustments to config via `SAVE_CONFIG`
+- Adjustments become the new calibrated offsets
+- Klipper restarts to apply changes
+
+**Best practice workflow:**
+
+1. Start print, observe first layer
+2. Use `SET_TOOL_Z_ADJUST` or `GLOBAL_Z_ADJUST` as needed
+3. Complete the print
+4. If satisfied, run `SAVE_TOOL_Z_ADJUSTMENTS`
+5. If not satisfied, adjustments are discarded on next restart
+
+---
+
+## 8. When to Re‑Calibrate
 
 Re‑run **XY calibration** (`NUDGE_FIND_TOOL_OFFSETS`) when:
 
@@ -330,9 +477,9 @@ As a rule of thumb:
 
 ---
 
-## 7. Troubleshooting Calibration Issues
+## 9. Troubleshooting Calibration Issues
 
-### 7.1. Tool Crashes During Calibration
+### 9.1. Tool Crashes During Calibration
 
 - Stop immediately (emergency stop)
 - Check:
@@ -344,7 +491,7 @@ Before retrying, manually test pickup/dropoff at **reduced speeds**.
 
 ---
 
-### 7.2. Offsets Are Huge or Nonsense
+### 9.2. Offsets Are Huge or Nonsense
 
 If the computed offsets are clearly wrong (e.g. many millimeters off):
 
@@ -360,7 +507,7 @@ Then repeat the relevant calibration step more carefully.
 
 ---
 
-### 7.3. First Layer Still Inconsistent
+### 9.3. First Layer Still Inconsistent
 
 If Z offsets look okay but first layer quality still differs:
 
@@ -373,7 +520,9 @@ If Z offsets look okay but first layer quality still differs:
 
 ---
 
-## 8. Summary
+## 10. Summary
+
+### Quick Start (Standard Workflow)
 
 1. **Pick a reference tool** (usually T0) and set it:
 
@@ -398,6 +547,35 @@ If Z offsets look okay but first layer quality still differs:
 4. **Verify**:
    - Tools line up over a common mark
    - First layers are consistent for all tools
+
+### Full Matrix Calibration (v1.1.0+)
+
+For maximum accuracy, use batch calibration:
+
+```gcode
+# Full XY matrix (requires kTAMV)
+KTAMV_CALIBRATE_ALL_TOOLS_XY
+
+# Full Z matrix (requires Beacon)
+BEACON_CALIBRATE_ALL_TOOLS_Z
+```
+
+### Live Adjustments During Print (v1.1.0+)
+
+Fine-tune Z-offsets without recalibration:
+
+```gcode
+# Adjust single tool
+SET_TOOL_Z_ADJUST TOOL=2 Z=+0.02
+
+# Adjust all tools
+GLOBAL_Z_ADJUST Z=-0.01
+
+# Save after successful print
+SAVE_TOOL_Z_ADJUSTMENTS
+```
+
+---
 
 Once these steps are done, your tool offsets should be solid enough
 to run real multi‑tool prints with confidence.
