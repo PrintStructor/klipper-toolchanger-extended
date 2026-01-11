@@ -104,88 +104,104 @@ class Ktamv_Server_Detection_Manager:
 
 # ----------------- TAMV Nozzle Detection as tested in ktamv_cv -----------------
 
-    def createDetectors(self):
+    # Base resolution for parameter scaling (original kTAMV values)
+    BASE_WIDTH = 640
+    BASE_HEIGHT = 480
+
+    def createDetectors(self, scale_factor=1.0):
+        """
+        Create blob detectors with parameters scaled for the current resolution.
+        scale_factor: Area scale factor (linear_scale²). For 1280x720: scale_factor=4.0
+        """
+        area_scale = scale_factor
+
         # Standard Parameters
-        if(True):
-            self.standardParams = cv2.SimpleBlobDetector_Params()
-            # Thresholds
-            self.standardParams.minThreshold = 1
-            self.standardParams.maxThreshold = 50
-            self.standardParams.thresholdStep = 1
-            # Area
-            self.standardParams.filterByArea = True
-            self.standardParams.minArea = 400
-            self.standardParams.maxArea = 900
-            # Circularity
-            self.standardParams.filterByCircularity = True
-            self.standardParams.minCircularity = 0.8
-            self.standardParams.maxCircularity= 1
-            # Convexity
-            self.standardParams.filterByConvexity = True
-            self.standardParams.minConvexity = 0.3
-            self.standardParams.maxConvexity = 1
-            # Inertia
-            self.standardParams.filterByInertia = True
-            self.standardParams.minInertiaRatio = 0.3
+        self.standardParams = cv2.SimpleBlobDetector_Params()
+        # Thresholds (not resolution dependent)
+        self.standardParams.minThreshold = 1
+        self.standardParams.maxThreshold = 50
+        self.standardParams.thresholdStep = 1
+        # Area (scale with resolution)
+        self.standardParams.filterByArea = True
+        self.standardParams.minArea = int(400 * area_scale)
+        self.standardParams.maxArea = int(900 * area_scale)
+        # Circularity (not resolution dependent)
+        self.standardParams.filterByCircularity = True
+        self.standardParams.minCircularity = 0.8
+        self.standardParams.maxCircularity = 1
+        # Convexity
+        self.standardParams.filterByConvexity = True
+        self.standardParams.minConvexity = 0.3
+        self.standardParams.maxConvexity = 1
+        # Inertia
+        self.standardParams.filterByInertia = True
+        self.standardParams.minInertiaRatio = 0.3
 
         # Relaxed Parameters
-        if(True):
-            self.relaxedParams = cv2.SimpleBlobDetector_Params()
-            # Thresholds
-            self.relaxedParams.minThreshold = 1
-            self.relaxedParams.maxThreshold = 50
-            self.relaxedParams.thresholdStep = 1
-            # Area
-            self.relaxedParams.filterByArea = True
-            self.relaxedParams.minArea = 600
-            self.relaxedParams.maxArea = 15000
-            # Circularity
-            self.relaxedParams.filterByCircularity = True
-            self.relaxedParams.minCircularity = 0.6
-            self.relaxedParams.maxCircularity= 1
-            # Convexity
-            self.relaxedParams.filterByConvexity = True
-            self.relaxedParams.minConvexity = 0.1
-            self.relaxedParams.maxConvexity = 1
-            # Inertia
-            self.relaxedParams.filterByInertia = True
-            self.relaxedParams.minInertiaRatio = 0.3
+        self.relaxedParams = cv2.SimpleBlobDetector_Params()
+        self.relaxedParams.minThreshold = 1
+        self.relaxedParams.maxThreshold = 50
+        self.relaxedParams.thresholdStep = 1
+        self.relaxedParams.filterByArea = True
+        self.relaxedParams.minArea = int(600 * area_scale)
+        self.relaxedParams.maxArea = int(15000 * area_scale)
+        self.relaxedParams.filterByCircularity = True
+        self.relaxedParams.minCircularity = 0.6
+        self.relaxedParams.maxCircularity = 1
+        self.relaxedParams.filterByConvexity = True
+        self.relaxedParams.minConvexity = 0.1
+        self.relaxedParams.maxConvexity = 1
+        self.relaxedParams.filterByInertia = True
+        self.relaxedParams.minInertiaRatio = 0.3
 
         # Super Relaxed Parameters
-            t1=20
-            t2=200
-            all=0.5
-            area=200
-            
-            self.superRelaxedParams = cv2.SimpleBlobDetector_Params()
-        
-            self.superRelaxedParams.minThreshold = t1
-            self.superRelaxedParams.maxThreshold = t2
-            
-            self.superRelaxedParams.filterByArea = True
-            self.superRelaxedParams.minArea = area
-            
-            self.superRelaxedParams.filterByCircularity = True
-            self.superRelaxedParams.minCircularity = all
-            
-            self.superRelaxedParams.filterByConvexity = True
-            self.superRelaxedParams.minConvexity = all
-            
-            self.superRelaxedParams.filterByInertia = True
-            self.superRelaxedParams.minInertiaRatio = all
-            
-            self.superRelaxedParams.filterByColor = False
+        self.superRelaxedParams = cv2.SimpleBlobDetector_Params()
+        self.superRelaxedParams.minThreshold = 20
+        self.superRelaxedParams.maxThreshold = 200
+        self.superRelaxedParams.filterByArea = True
+        self.superRelaxedParams.minArea = int(200 * area_scale)
+        self.superRelaxedParams.filterByCircularity = True
+        self.superRelaxedParams.minCircularity = 0.5
+        self.superRelaxedParams.filterByConvexity = True
+        self.superRelaxedParams.minConvexity = 0.5
+        self.superRelaxedParams.filterByInertia = True
+        self.superRelaxedParams.minInertiaRatio = 0.5
+        self.superRelaxedParams.filterByColor = False
+        self.superRelaxedParams.minDistBetweenBlobs = 2
 
-            self.superRelaxedParams.minDistBetweenBlobs = 2
-            
         # Create 3 detectors
         self.detector = cv2.SimpleBlobDetector_create(self.standardParams)
         self.relaxedDetector = cv2.SimpleBlobDetector_create(self.relaxedParams)
         self.superRelaxedDetector = cv2.SimpleBlobDetector_create(self.superRelaxedParams)
 
+        self.log("Detectors created with area_scale=%.2f (minArea: %d-%d)" %
+                 (area_scale, self.standardParams.minArea, self.relaxedParams.maxArea))
+
+    def updateDetectorsForImage(self, image):
+        """
+        Recalculate detectors if image resolution changed.
+        """
+        h, w = image.shape[:2]
+        linear_scale = (w / self.BASE_WIDTH + h / self.BASE_HEIGHT) / 2.0
+        area_scale = linear_scale ** 2
+
+        # Also scale HoughCircles parameters
+        self.hough_minRadius = int(10 * linear_scale)
+        self.hough_maxRadius = int(50 * linear_scale)
+
+        # Only recreate if scale changed significantly
+        if not hasattr(self, '_current_scale') or abs(self._current_scale - area_scale) > 0.1:
+            self._current_scale = area_scale
+            self.createDetectors(area_scale)
+            self.log("Resolution %dx%d detected, scale_factor=%.2f" % (w, h, area_scale))
+
     def nozzleDetection(self, image):
         # working frame object
         nozzleDetectFrame = copy.deepcopy(image)
+
+        # Auto-scale detection parameters for current image resolution
+        self.updateDetectorsForImage(nozzleDetectFrame)
+
         # return value for keypoints
         keypoints = None
         center = (None, None)

@@ -141,18 +141,27 @@ info "kTAMV Detection Improvements"
 if [[ -d "${KTAMV_PATH}/server" ]]; then
   if [[ -f "${KTAMV_SRC}/ktamv_server_dm.py" ]]; then
     echo
-    read -r -p "[kTAMV] Install improved nozzle detection? (CLAHE, HoughCircles fallback) [y/N] " KTAMV_REPLY
+    info "kTAMV Enhanced Detection available:"
+    info "  - 16:9 aspect ratio (1280x720)"
+    info "  - Auto-scaling detection parameters"
+    info "  - CLAHE preprocessing + HoughCircles fallback"
+    echo
+    read -r -p "[kTAMV] Install improved nozzle detection? [y/N] " KTAMV_REPLY
     case "${KTAMV_REPLY}" in
       [yY][eE][sS]|[yY])
-        # Backup original if not already backed up
-        if [[ ! -f "${KTAMV_PATH}/server/ktamv_server_dm.py.original" ]]; then
-          cp "${KTAMV_PATH}/server/ktamv_server_dm.py" "${KTAMV_PATH}/server/ktamv_server_dm.py.original"
-          info "Backed up original detection to ktamv_server_dm.py.original"
-        fi
+        # Backup originals if not already backed up
+        for f in ktamv_server_dm.py ktamv_server_io.py ktamv_server.py; do
+          if [[ -f "${KTAMV_PATH}/server/${f}" ]] && [[ ! -f "${KTAMV_PATH}/server/${f}.backup" ]]; then
+            cp "${KTAMV_PATH}/server/${f}" "${KTAMV_PATH}/server/${f}.backup"
+            info "Backed up ${f}"
+          fi
+        done
 
-        # Copy improved detection
-        cp "${KTAMV_SRC}/ktamv_server_dm.py" "${KTAMV_PATH}/server/ktamv_server_dm.py"
-        info "Installed improved kTAMV detection"
+        # Copy improved files
+        cp "${KTAMV_SRC}/ktamv_server_dm.py" "${KTAMV_PATH}/server/"
+        cp "${KTAMV_SRC}/ktamv_server_io.py" "${KTAMV_PATH}/server/"
+        cp "${KTAMV_SRC}/ktamv_server.py" "${KTAMV_PATH}/server/"
+        info "Installed improved kTAMV detection (1280x720, auto-scaling)"
 
         # Restart kTAMV if running
         if pgrep -f "ktamv_server.py" >/dev/null 2>&1; then
@@ -171,6 +180,8 @@ if [[ -d "${KTAMV_PATH}/server" ]]; then
           else
             warn "Could not find kTAMV Python environment. Please restart kTAMV manually."
           fi
+        else
+          info "kTAMV server not running. Start it manually after configuration."
         fi
         ;;
       *)
