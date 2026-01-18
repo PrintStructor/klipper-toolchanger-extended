@@ -994,9 +994,15 @@ class Toolchanger:
             if self.calibration_mode:
                 self.gcode.run_script_from_command('SET_GCODE_OFFSET Z=0 ABSOLUTE=1')
                 self.gcode.respond_info("⚙️ Calibration mode: Z-offset set to 0 for T%d" % tool.tool_number)
+            elif tool == self.initial_tool:
+                # Initial tool is the reference - its Z-offset is ALWAYS 0 + global
+                z_offset = 0.0
+                total_offset = z_offset + global_offset
+                self.gcode.respond_info("T%d Z-offset: tool=%.3f (initial/reference), global=%.3f, total=%.3f" %
+                                        (tool.tool_number, z_offset, global_offset, total_offset))
+                self.gcode.run_script_from_command('SET_GCODE_OFFSET Z=%.3f ABSOLUTE=1' % (total_offset,))
             else:
-                # All tools treated equally - get z_offset from z_offsets dictionary
-                # Initial tool also has an entry (defaults to 0, can be adjusted)
+                # Other tools - get z_offset from z_offsets dictionary relative to initial tool
                 z_offset = self.initial_tool.z_offsets.get(tool.tool_number, 0.0) if self.initial_tool else 0.0
                 total_offset = z_offset + global_offset
                 self.gcode.respond_info("T%d Z-offset: tool=%.3f, global=%.3f, total=%.3f" %
