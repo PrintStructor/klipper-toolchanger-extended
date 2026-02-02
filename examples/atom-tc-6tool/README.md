@@ -35,6 +35,7 @@ atom-tc-6tool/
 ├── CALIBRATION_GUIDE.md         ← Step-by-step calibration workflow
 ├── printer.cfg                  ← Main printer config
 ├── macros.cfg                   ← High-level user macros (PRINT_START, etc.)
+├── taxy-macros.cfg              ← TAXY AI calibration macros (recommended)
 ├── ktamv-macros.cfg             ← kTAMV integration macros (legacy)
 ├── mainsail.cfg                 ← Mainsail UI integration
 ├── variables.cfg                ← Persistent variables (offsets, coefficients)
