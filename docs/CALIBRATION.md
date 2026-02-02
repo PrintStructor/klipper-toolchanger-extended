@@ -455,7 +455,149 @@ SAVE_TOOL_Z_ADJUSTMENTS
 
 ---
 
-## 8. When to Re‑Calibrate
+## 8. Thermal Expansion Compensation
+
+Nozzles expand as they heat up, changing the effective Z-offset between cold calibration (150°C) and actual printing temperatures (200-300°C). The thermal compensation system automatically adjusts Z-offsets based on nozzle temperature.
+
+### 8.1. How Thermal Compensation Works
+
+**The Problem:**
+- Beacon Z-calibration is done at 150°C (for consistent measurements)
+- During printing, nozzles can be 200-300°C
+- Temperature difference causes nozzle expansion: ~0.5-0.7µm per °C
+- At 270°C vs 150°C (ΔT=120°C), expansion is ~68µm (0.068mm)
+
+**The Solution:**
+- `BEACON_CALIBRATE_NOZZLE_TEMP_OFFSET` measures expansion coefficient per tool
+- `APPLY_NOZZLE_TEMP_OFFSET` applies compensation during prints
+- Compensation is temperature-dependent and tool-specific
+
+### 8.2. Calibrating Thermal Expansion Coefficients
+
+Run this **once per tool** to measure thermal expansion:
+
+```gcode
+BEACON_CALIBRATE_NOZZLE_TEMP_OFFSET INITIAL_TOOL=0
+```
+
+**What happens:**
+1. Tool heats to 150°C (reference temperature)
+2. Measures Z-offset at 150°C
+3. Heats to multiple temperatures (180°C, 210°C, 240°C, 270°C)
+4. Measures Z-offset at each temperature
+5. Calculates linear expansion coefficient (mm/°C)
+6. Saves coefficient to `variables.cfg`
+
+**Repeat for all tools:**
+```gcode
+BEACON_CALIBRATE_NOZZLE_TEMP_OFFSET INITIAL_TOOL=1
+BEACON_CALIBRATE_NOZZLE_TEMP_OFFSET INITIAL_TOOL=2
+# ... etc for T3-T5
+```
+
+### 8.3. Applying Thermal Compensation During Prints
+
+Thermal compensation is **automatically applied** in `PRINT_START`:
+
+```gcode
+# Inside PRINT_START macro
+APPLY_NOZZLE_TEMP_OFFSET TOOL={initial_tool}
+```
+
+**Manual application** (if needed):
+```gcode
+# Apply for current tool
+APPLY_NOZZLE_TEMP_OFFSET
+
+# Apply for specific tool
+APPLY_NOZZLE_TEMP_OFFSET TOOL=2
+```
+
+**Clear compensation:**
+```gcode
+CLEAR_NOZZLE_TEMP_OFFSET
+```
+
+### 8.4. Understanding the Output
+
+When `APPLY_NOZZLE_TEMP_OFFSET` runs, you'll see:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Thermal Offset Applied (T0)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Nozzle temp:    270.4°C
+Reference:      150.0°C
+ΔT:             120.4°C
+Coefficient:    0.00056944 mm/°C
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Z offset:       +0.0686mm (68.6µm)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+This means:
+- Nozzle is 120.4°C hotter than calibration temperature
+- Expansion is 0.686µm per degree
+- Total Z-offset compensation: +0.0686mm
+
+**Important:** This offset is **added** to the base Z-offset via `Z_ADJUST`, so it doesn't overwrite calibrated values.
+
+### 8.5. When to Recalibrate Thermal Coefficients
+
+Re-run `BEACON_CALIBRATE_NOZZLE_TEMP_OFFSET` when:
+
+- You change nozzles or hotends
+- You notice first-layer issues at different temperatures
+- You switch to a different nozzle material (brass vs hardened steel)
+- Coefficients seem incorrect (excessive or no compensation)
+
+**Normal coefficient range:** 0.0004 - 0.0008 mm/°C
+
+If your coefficient is outside this range, check:
+- Beacon probe stability
+- Mechanical play in the toolhead
+- Bed mesh consistency
+
+### 8.6. Integration with Other Z-Offset Systems
+
+Thermal compensation works **in addition to**:
+
+1. **Base Z-offsets** (from `MEASURE_TOOL_Z_OFFSETS`)
+2. **Per-tool adjustments** (from `SET_TOOL_Z_ADJUST`)
+3. **Global adjustments** (from `GLOBAL_Z_ADJUST`)
+
+**Order of application:**
+```
+Final Z = Base Z-offset + Thermal compensation + Live adjustments
+```
+
+**Example:**
+- Base Z-offset for T1: -0.1503mm (calibrated)
+- Thermal compensation: +0.0686mm (at 270°C)
+- Live adjustment: +0.02mm (user tweak)
+- **Final Z-offset: -0.0617mm**
+
+### 8.7. Troubleshooting Thermal Compensation
+
+**Compensation not visible in UI:**
+- Check PRINT_START order: `APPLY_NOZZLE_TEMP_OFFSET` must run **after** `SET_INITIAL_TOOL`
+- Verify thermal offset is being applied (check console output)
+
+**Coefficient is 0.0:**
+- Tool hasn't been calibrated yet
+- Run `BEACON_CALIBRATE_NOZZLE_TEMP_OFFSET INITIAL_TOOL=X`
+
+**First layer still wrong:**
+- Thermal compensation fixes temperature-related expansion only
+- Check base Z-offsets are correct
+- Verify bed mesh is active
+- Consider per-tool Z-adjust for fine-tuning
+
+For detailed thermal calibration procedures, see [THERMAL_COMPENSATION.md](THERMAL_COMPENSATION.md).
+
+---
+
+## 9. When to Re‑Calibrate
 
 Re‑run **XY calibration** (`NUDGE_FIND_TOOL_OFFSETS`) when:
 
@@ -477,9 +619,9 @@ As a rule of thumb:
 
 ---
 
-## 9. Troubleshooting Calibration Issues
+## 10. Troubleshooting Calibration Issues
 
-### 9.1. Tool Crashes During Calibration
+### 10.1. Tool Crashes During Calibration
 
 - Stop immediately (emergency stop)
 - Check:
@@ -491,7 +633,7 @@ Before retrying, manually test pickup/dropoff at **reduced speeds**.
 
 ---
 
-### 9.2. Offsets Are Huge or Nonsense
+### 10.2. Offsets Are Huge or Nonsense
 
 If the computed offsets are clearly wrong (e.g. many millimeters off):
 
@@ -507,7 +649,7 @@ Then repeat the relevant calibration step more carefully.
 
 ---
 
-### 9.3. First Layer Still Inconsistent
+### 10.3. First Layer Still Inconsistent
 
 If Z offsets look okay but first layer quality still differs:
 
@@ -520,7 +662,7 @@ If Z offsets look okay but first layer quality still differs:
 
 ---
 
-## 10. Summary
+## 11. Summary
 
 ### Quick Start (Standard Workflow)
 

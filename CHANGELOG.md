@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Initial Tool Z-Offset Bug** (`toolchanger.py`)
+  - Initial/reference tool now correctly gets Z-offset of 0.0
+  - Previously could inherit non-zero offset from config causing incorrect first layer
+  - Added explicit check: `if tool == self.initial_tool: z_offset = 0.0`
+  - Ensures initial tool is always the true reference point (Z=0)
+
+- **Thermal Offset Integration** (`macros.cfg`)
+  - Fixed PRINT_START macro overwriting thermal expansion compensation
+  - `APPLY_NOZZLE_TEMP_OFFSET` now runs AFTER `SET_INITIAL_TOOL`
+  - Previously thermal offset was set then immediately cleared by tool initialization
+  - Thermal compensation now properly visible in UI and applied to prints
+
 ### Planned Features
 - Additional dock path profiles (PADS, RODS variations)
 - Automatic backup system for configuration

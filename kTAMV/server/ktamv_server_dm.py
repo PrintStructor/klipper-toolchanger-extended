@@ -110,72 +110,60 @@ class Ktamv_Server_Detection_Manager:
 
     def createDetectors(self, scale_factor=1.0):
         """
-        Create blob detectors with parameters scaled for the current resolution.
-        scale_factor: Area scale factor (linear_scale²). For 1280x720: scale_factor=4.0
+        Create blob detectors for DARK nozzle openings.
+        The nozzle opening is DARK - we need blobColor=0!
         """
         area_scale = scale_factor
 
-        # Standard Parameters
+        # Dark blob detector - specifically for dark nozzle openings
         self.standardParams = cv2.SimpleBlobDetector_Params()
-        # Thresholds (not resolution dependent)
-        self.standardParams.minThreshold = 1
-        self.standardParams.maxThreshold = 50
-        self.standardParams.thresholdStep = 1
-        # Area (scale with resolution)
+        self.standardParams.minThreshold = 10
+        self.standardParams.maxThreshold = 200
+        self.standardParams.thresholdStep = 10
         self.standardParams.filterByArea = True
-        self.standardParams.minArea = int(400 * area_scale)
-        self.standardParams.maxArea = int(900 * area_scale)
-        # Circularity (not resolution dependent)
+        self.standardParams.minArea = int(200 * area_scale)
+        self.standardParams.maxArea = int(50000 * area_scale)
         self.standardParams.filterByCircularity = True
-        self.standardParams.minCircularity = 0.8
-        self.standardParams.maxCircularity = 1
-        # Convexity
-        self.standardParams.filterByConvexity = True
-        self.standardParams.minConvexity = 0.3
-        self.standardParams.maxConvexity = 1
-        # Inertia
-        self.standardParams.filterByInertia = True
-        self.standardParams.minInertiaRatio = 0.3
+        self.standardParams.minCircularity = 0.5
+        self.standardParams.filterByConvexity = False
+        self.standardParams.filterByInertia = False
+        self.standardParams.filterByColor = True
+        self.standardParams.blobColor = 0  # DARK blobs only!
 
-        # Relaxed Parameters
+        # Relaxed dark blob detector
         self.relaxedParams = cv2.SimpleBlobDetector_Params()
-        self.relaxedParams.minThreshold = 1
-        self.relaxedParams.maxThreshold = 50
-        self.relaxedParams.thresholdStep = 1
+        self.relaxedParams.minThreshold = 5
+        self.relaxedParams.maxThreshold = 200
+        self.relaxedParams.thresholdStep = 10
         self.relaxedParams.filterByArea = True
-        self.relaxedParams.minArea = int(600 * area_scale)
-        self.relaxedParams.maxArea = int(15000 * area_scale)
-        self.relaxedParams.filterByCircularity = True
-        self.relaxedParams.minCircularity = 0.6
-        self.relaxedParams.maxCircularity = 1
-        self.relaxedParams.filterByConvexity = True
-        self.relaxedParams.minConvexity = 0.1
-        self.relaxedParams.maxConvexity = 1
-        self.relaxedParams.filterByInertia = True
-        self.relaxedParams.minInertiaRatio = 0.3
+        self.relaxedParams.minArea = int(100 * area_scale)
+        self.relaxedParams.maxArea = int(80000 * area_scale)
+        self.relaxedParams.filterByCircularity = False
+        self.relaxedParams.filterByConvexity = False
+        self.relaxedParams.filterByInertia = False
+        self.relaxedParams.filterByColor = True
+        self.relaxedParams.blobColor = 0  # DARK blobs only!
 
-        # Super Relaxed Parameters
+        # Super relaxed - any dark blob
         self.superRelaxedParams = cv2.SimpleBlobDetector_Params()
-        self.superRelaxedParams.minThreshold = 20
-        self.superRelaxedParams.maxThreshold = 200
+        self.superRelaxedParams.minThreshold = 1
+        self.superRelaxedParams.maxThreshold = 255
+        self.superRelaxedParams.thresholdStep = 20
         self.superRelaxedParams.filterByArea = True
-        self.superRelaxedParams.minArea = int(200 * area_scale)
-        self.superRelaxedParams.filterByCircularity = True
-        self.superRelaxedParams.minCircularity = 0.5
-        self.superRelaxedParams.filterByConvexity = True
-        self.superRelaxedParams.minConvexity = 0.5
-        self.superRelaxedParams.filterByInertia = True
-        self.superRelaxedParams.minInertiaRatio = 0.5
-        self.superRelaxedParams.filterByColor = False
-        self.superRelaxedParams.minDistBetweenBlobs = 2
+        self.superRelaxedParams.minArea = int(50 * area_scale)
+        self.superRelaxedParams.filterByCircularity = False
+        self.superRelaxedParams.filterByConvexity = False
+        self.superRelaxedParams.filterByInertia = False
+        self.superRelaxedParams.filterByColor = True
+        self.superRelaxedParams.blobColor = 0  # DARK blobs only!
 
-        # Create 3 detectors
+        # Create detectors
         self.detector = cv2.SimpleBlobDetector_create(self.standardParams)
         self.relaxedDetector = cv2.SimpleBlobDetector_create(self.relaxedParams)
         self.superRelaxedDetector = cv2.SimpleBlobDetector_create(self.superRelaxedParams)
 
-        self.log("Detectors created with area_scale=%.2f (minArea: %d-%d)" %
-                 (area_scale, self.standardParams.minArea, self.relaxedParams.maxArea))
+        self.log("Dark-blob detectors created (blobColor=0, minArea: %d, scale: %.2f)" %
+                 (self.standardParams.minArea, area_scale))
 
     def updateDetectorsForImage(self, image):
         """
@@ -202,63 +190,31 @@ class Ktamv_Server_Detection_Manager:
         # Auto-scale detection parameters for current image resolution
         self.updateDetectorsForImage(nozzleDetectFrame)
 
+        # Get image dimensions for center region filtering
+        h, w = nozzleDetectFrame.shape[:2]
+        img_center_x, img_center_y = w // 2, h // 2
+
+        # Define center region of interest (ROI) - only consider detections within this area
+        # ROI is 60% of image width/height around center (larger for tool offsets)
+        roi_margin_x = int(w * 0.30)  # 30% margin on each side = 60% ROI
+        roi_margin_y = int(h * 0.30)
+        roi_x_min = img_center_x - roi_margin_x
+        roi_x_max = img_center_x + roi_margin_x
+        roi_y_min = img_center_y - roi_margin_y
+        roi_y_max = img_center_y + roi_margin_y
+
         # return value for keypoints
         keypoints = None
         center = (None, None)
         keypointColor = (0,0,255)
 
-        # Preprocess images with all algorithms including CLAHE
-        preprocessorImage0 = self.preprocessImage(frameInput=nozzleDetectFrame, algorithm=0)
-        preprocessorImage1 = self.preprocessImage(frameInput=nozzleDetectFrame, algorithm=1)
-        preprocessorImage2 = self.preprocessImage(frameInput=nozzleDetectFrame, algorithm=2)
-        preprocessorImage3 = self.preprocessImage(frameInput=nozzleDetectFrame, algorithm=3)  # CLAHE
-        preprocessorImage4 = self.preprocessImage(frameInput=nozzleDetectFrame, algorithm=4)  # CLAHE + morphology
-
-        # Detection cascade - try progressively more relaxed detection
-        detection_combos = [
-            (self.detector, preprocessorImage0, (0,0,255), "standard+YUV"),
-            (self.detector, preprocessorImage1, (0,255,0), "standard+triangle"),
-            (self.detector, preprocessorImage3, (0,255,255), "standard+CLAHE"),
-            (self.relaxedDetector, preprocessorImage0, (255,0,0), "relaxed+YUV"),
-            (self.relaxedDetector, preprocessorImage1, (39,127,255), "relaxed+triangle"),
-            (self.relaxedDetector, preprocessorImage3, (255,127,39), "relaxed+CLAHE"),
-            (self.relaxedDetector, preprocessorImage4, (127,255,127), "relaxed+CLAHE+morph"),
-            (self.superRelaxedDetector, preprocessorImage2, (39,255,127), "superRelaxed+median"),
-            (self.superRelaxedDetector, preprocessorImage4, (255,0,255), "superRelaxed+CLAHE+morph"),
-        ]
-
-        for i, (detector, preprocessed, color, name) in enumerate(detection_combos):
-            keypoints = detector.detect(preprocessed)
-
-            if len(keypoints) == 1:
-                # Perfect: exactly one detection
-                keypointColor = color
-                self.__algorithm = i + 1
-                self.log("Nozzle detected with algo %d (%s)" % (self.__algorithm, name))
-                break
-            elif len(keypoints) > 1:
-                # Multiple detections: pick the most centered one
-                best_idx = self.find_closest_keypoint(keypoints, nozzleDetectFrame.shape)
-                if best_idx is not None:
-                    # Keep only the best keypoint
-                    keypoints = [keypoints[best_idx]]
-                    keypointColor = color
-                    self.__algorithm = i + 1
-                    self.log("Nozzle: picked best of %d with algo %d (%s)" % (len(keypoints)+1, self.__algorithm, name))
-                    break
-
-        # If blob detection failed, try HoughCircles as fallback
-        if keypoints is None or len(keypoints) == 0:
-            self.log("Blob detection failed, trying HoughCircles...")
-            hough_result = self.detectWithHoughCircles(nozzleDetectFrame, preprocessorImage3)
-            if hough_result is not None:
-                keypoints = hough_result
-                keypointColor = (255, 165, 0)  # Orange for HoughCircles
-                self.__algorithm = 100  # Special code for HoughCircles
-                self.log("Nozzle detected with HoughCircles")
-
-        if keypoints is None or len(keypoints) == 0:
-            self.log("Nozzle detection failed completely.")
+        # PRIMARY: Find darkest circular region (the nozzle opening is the darkest spot!)
+        keypoints = self.findNozzleByDarkCenter(nozzleDetectFrame, (img_center_x, img_center_y), search_radius=200)
+        if keypoints is not None and len(keypoints) > 0:
+            keypointColor = (0, 255, 0)  # Green
+            self.__algorithm = 1
+        else:
+            self.log("DarkCenter failed, no nozzle detected")
             
             
         # Get image dimensions for dynamic center calculation
@@ -296,6 +252,9 @@ class Ktamv_Server_Detection_Manager:
             nozzleDetectFrame = cv2.circle(img=nozzleDetectFrame, center=(center_x, center_y), radius=keypointRadius, color=(0,0,0), thickness=3, lineType=cv2.LINE_AA)
             nozzleDetectFrame = cv2.circle(img=nozzleDetectFrame, center=(center_x, center_y), radius=keypointRadius+1, color=(0,0,255), thickness=1, lineType=cv2.LINE_AA)
             center = None
+
+        # Draw ROI rectangle to show detection area
+        cv2.rectangle(nozzleDetectFrame, (roi_x_min, roi_y_min), (roi_x_max, roi_y_max), (100, 100, 100), 1)
 
         # Draw crosshair at image center (dynamic based on actual resolution)
         nozzleDetectFrame = cv2.line(nozzleDetectFrame, (center_x, 0), (center_x, h), (0,0,0), 2)
@@ -365,6 +324,114 @@ class Ktamv_Server_Detection_Manager:
 
         return outputFrame
 
+    def findNozzleByDarkCenter(self, image, image_center, search_radius=200):
+        """
+        Find nozzle using HoughCircles to detect the circular nozzle opening.
+        This finds the CENTER of the circle, not just the darkest pixel.
+        """
+        try:
+            h, w = image.shape[:2]
+            cx, cy = image_center
+
+            # Convert to grayscale
+            if len(image.shape) == 3:
+                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            else:
+                gray = image.copy()
+
+            # Define search region around center
+            x1 = max(0, cx - search_radius)
+            x2 = min(w, cx + search_radius)
+            y1 = max(0, cy - search_radius)
+            y2 = min(h, cy + search_radius)
+
+            roi = gray[y1:y2, x1:x2]
+
+            # Blur and enhance contrast for HoughCircles
+            blurred = cv2.GaussianBlur(roi, (5, 5), 0)
+
+            # Enhance contrast with CLAHE
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            enhanced = clahe.apply(blurred)
+
+            # Use HoughCircles to find circular openings
+            # The nozzle opening is a CIRCLE - find it by shape, not just darkness
+            circles = cv2.HoughCircles(
+                enhanced,
+                cv2.HOUGH_GRADIENT,
+                dp=1,
+                minDist=20,
+                param1=100,
+                param2=15,  # Very low = detect more circles
+                minRadius=5,
+                maxRadius=100
+            )
+
+            nozzle_x, nozzle_y, radius = None, None, 15
+
+            if circles is not None:
+                circles = np.uint16(np.around(circles))
+                roi_cx, roi_cy = roi.shape[1] // 2, roi.shape[0] // 2
+
+                # Find the circle closest to ROI center that is also DARK inside
+                best_circle = None
+                best_score = float('inf')
+
+                for circle in circles[0, :]:
+                    circ_x, circ_y, circ_r = circle
+
+                    # Check if circle center is dark (it should be the nozzle opening)
+                    inner_brightness = blurred[max(0,circ_y-3):circ_y+3, max(0,circ_x-3):circ_x+3].mean()
+
+                    # Score: prefer dark AND close to center
+                    dist_to_center = np.sqrt((circ_x - roi_cx)**2 + (circ_y - roi_cy)**2)
+                    score = dist_to_center + inner_brightness * 0.5
+
+                    if score < best_score:
+                        best_score = score
+                        best_circle = circle
+
+                if best_circle is not None:
+                    nozzle_x = x1 + best_circle[0]
+                    nozzle_y = y1 + best_circle[1]
+                    radius = best_circle[2]
+
+            # Fallback to darkest point if no circles found
+            if nozzle_x is None:
+                min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(blurred)
+                nozzle_x = x1 + min_loc[0]
+                nozzle_y = y1 + min_loc[1]
+                radius = 15
+
+            class FakeKeypoint:
+                def __init__(self, x, y, size):
+                    self.pt = (float(x), float(y))
+                    self.size = float(size)
+
+            self.log("DarkCenter: nozzle at (%d, %d), min_val=%d, radius=%.1f" % (nozzle_x, nozzle_y, min_val, radius))
+            return [FakeKeypoint(nozzle_x, nozzle_y, max(radius * 2, 20))]
+
+        except Exception as e:
+            self.log("findNozzleByDarkCenter error: %s" % str(e))
+
+        return None
+
+    def _get_region_brightness(self, gray_image, cx, cy, radius):
+        """Get average brightness in a circular region."""
+        h, w = gray_image.shape[:2]
+        mask = np.zeros((h, w), dtype=np.uint8)
+        cv2.circle(mask, (cx, cy), radius, 255, -1)
+        return cv2.mean(gray_image, mask=mask)[0]
+
+    def _get_ring_brightness(self, gray_image, cx, cy, inner_radius, outer_radius):
+        """Get average brightness in a ring (annulus) region."""
+        h, w = gray_image.shape[:2]
+        mask = np.zeros((h, w), dtype=np.uint8)
+        cv2.circle(mask, (cx, cy), outer_radius, 255, -1)
+        cv2.circle(mask, (cx, cy), inner_radius, 0, -1)
+        mean_val = cv2.mean(gray_image, mask=mask)[0]
+        return mean_val if mean_val > 0 else 0
+
     def detectWithHoughCircles(self, original_frame, preprocessed_frame):
         """
         HoughCircles fallback detection when blob detection fails.
@@ -423,6 +490,108 @@ class Ktamv_Server_Detection_Manager:
 
         return None
 
+    def findDarkestCircularRegion(self, image, roi_center, roi_radius=100):
+        """
+        Find the center of the darkest circular region near the image center.
+        This specifically targets the nozzle opening (dark hole).
+        Filters by expected nozzle size (0.4-1.0mm at ~0.009mm/px = 20-60px radius)
+        Returns a keypoint-like object or None.
+        """
+        try:
+            h, w = image.shape[:2]
+            cx, cy = roi_center
+
+            # Expected nozzle radius range in pixels (at ~0.009mm/px for 1280x720)
+            # 0.4mm nozzle = ~22px radius, 1.0mm nozzle = ~55px radius
+            # Scale based on image resolution
+            scale = (w / 640 + h / 480) / 2.0
+            min_nozzle_radius = int(15 * scale)  # ~0.3mm minimum
+            max_nozzle_radius = int(70 * scale)  # ~1.2mm maximum
+
+            # Convert to grayscale
+            if len(image.shape) == 3:
+                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            else:
+                gray = image.copy()
+
+            # Apply Gaussian blur to reduce noise
+            blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+
+            # Create ROI mask around center
+            roi_x1 = max(0, cx - roi_radius)
+            roi_x2 = min(w, cx + roi_radius)
+            roi_y1 = max(0, cy - roi_radius)
+            roi_y2 = min(h, cy + roi_radius)
+
+            roi = blurred[roi_y1:roi_y2, roi_x1:roi_x2]
+
+            # Find the minimum (darkest) point in the ROI
+            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(roi)
+
+            # Refine by finding the centroid of the dark region
+            # Threshold to find pixels near the minimum value
+            threshold = min_val + 40  # Allow some tolerance
+            _, binary = cv2.threshold(roi, threshold, 255, cv2.THRESH_BINARY_INV)
+
+            # Find contours of the dark region
+            contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            if contours:
+                # Find the best contour: closest to darkest point AND within nozzle size range
+                best_contour = None
+                best_score = float('inf')
+
+                for contour in contours:
+                    area = cv2.contourArea(contour)
+                    if area < 100:  # Skip tiny noise
+                        continue
+
+                    # Calculate equivalent radius
+                    radius = np.sqrt(area / np.pi)
+
+                    # Skip if outside nozzle size range
+                    if radius < min_nozzle_radius or radius > max_nozzle_radius:
+                        continue
+
+                    M = cv2.moments(contour)
+                    if M["m00"] > 0:
+                        cont_cx = int(M["m10"] / M["m00"])
+                        cont_cy = int(M["m01"] / M["m00"])
+                        dist = np.sqrt((cont_cx - min_loc[0])**2 + (cont_cy - min_loc[1])**2)
+
+                        # Score: prefer close to darkest point AND good size
+                        # Ideal size is around 0.4-0.6mm nozzle (30-45px radius)
+                        ideal_radius = 35 * scale
+                        size_penalty = abs(radius - ideal_radius) * 0.5
+                        score = dist + size_penalty
+
+                        if score < best_score:
+                            best_score = score
+                            best_contour = contour
+
+                if best_contour is not None:
+                    # Get the centroid of the best contour
+                    M = cv2.moments(best_contour)
+                    if M["m00"] > 0:
+                        dark_x = roi_x1 + int(M["m10"] / M["m00"])
+                        dark_y = roi_y1 + int(M["m01"] / M["m00"])
+
+                        # Calculate equivalent radius
+                        area = cv2.contourArea(best_contour)
+                        radius = np.sqrt(area / np.pi)
+
+                        class FakeKeypoint:
+                            def __init__(self, x, y, size):
+                                self.pt = (float(x), float(y))
+                                self.size = float(size)
+
+                        return [FakeKeypoint(dark_x, dark_y, radius * 2)]
+
+        except Exception as e:
+            self.log("findDarkestCircularRegion error: %s" % str(e))
+
+        return None
+
     def find_closest_keypoint(self, keypoints, image_shape=None):
         """
         Find the keypoint closest to the image center.
@@ -447,6 +616,75 @@ class Ktamv_Server_Detection_Manager:
                 closest_index = i
 
         return closest_index
+
+    def validate_nozzle_contrast(self, image, keypoint, min_contrast=30):
+        """
+        Validate that a detected blob has the contrast pattern of a nozzle opening.
+        A nozzle should have a dark center (the opening) surrounded by brighter material.
+        Returns True if the contrast pattern matches a nozzle.
+        """
+        try:
+            x, y = int(keypoint.pt[0]), int(keypoint.pt[1])
+            radius = max(int(keypoint.size / 2), 5)
+            h, w = image.shape[:2]
+
+            # Convert to grayscale if needed
+            if len(image.shape) == 3:
+                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            else:
+                gray = image
+
+            # Ensure we're within image bounds
+            inner_r = max(radius // 3, 3)
+            outer_r = min(radius * 2, 50)
+
+            x_min = max(0, x - outer_r)
+            x_max = min(w, x + outer_r)
+            y_min = max(0, y - outer_r)
+            y_max = min(h, y + outer_r)
+
+            if x_max - x_min < 10 or y_max - y_min < 10:
+                return True  # Too small to validate, accept it
+
+            # Sample inner region (should be darker - the nozzle opening)
+            inner_mask = np.zeros((y_max - y_min, x_max - x_min), dtype=np.uint8)
+            cv2.circle(inner_mask, (x - x_min, y - y_min), inner_r, 255, -1)
+            inner_region = gray[y_min:y_max, x_min:x_max]
+            inner_mean = cv2.mean(inner_region, mask=inner_mask)[0]
+
+            # Sample outer ring (should be brighter - the nozzle tip)
+            outer_mask = np.zeros((y_max - y_min, x_max - x_min), dtype=np.uint8)
+            cv2.circle(outer_mask, (x - x_min, y - y_min), outer_r, 255, -1)
+            cv2.circle(outer_mask, (x - x_min, y - y_min), radius, 0, -1)  # Remove inner
+            outer_mean = cv2.mean(inner_region, mask=outer_mask)[0]
+
+            # Nozzle opening should be darker than surrounding
+            contrast = outer_mean - inner_mean
+
+            # Removed verbose logging for performance
+            return contrast >= min_contrast
+
+        except Exception as e:
+            self.log("Contrast validation error: %s" % str(e))
+            return True  # On error, accept the detection
+
+    def filter_keypoints_by_contrast(self, image, keypoints, min_contrast=20):
+        """
+        Filter keypoints to only those with valid nozzle contrast pattern.
+        """
+        if keypoints is None or len(keypoints) == 0:
+            return keypoints
+
+        valid_keypoints = []
+        for kp in keypoints:
+            if self.validate_nozzle_contrast(image, kp, min_contrast):
+                valid_keypoints.append(kp)
+
+        if len(valid_keypoints) == 0:
+            self.log("All keypoints failed contrast check, using original")
+            return keypoints  # Fall back to original if all fail
+
+        return valid_keypoints
 
     def adjust_gamma(self, image, gamma=1.2):
         # build a lookup table mapping the pixel values [0, 255] to

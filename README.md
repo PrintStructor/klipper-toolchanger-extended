@@ -49,6 +49,13 @@ This is an extension of [viesturz/klipper-toolchanger](https://github.com/viestu
 - Global Z-adjust affecting all tools equally
 - Save adjustments to config when satisfied
 
+**Thermal Expansion Compensation:**
+- Automatic nozzle expansion compensation based on temperature
+- Per-tool calibration of thermal expansion coefficients (0.5-0.7µm per °C)
+- Temperature-dependent Z-offset adjustments during printing
+- Compensates for 50-120°C temperature differences (20-68µm compensation)
+- Ensures accurate first layer regardless of printing temperature
+
 **Flexibility:**
 - Any tool can be used as the initial reference tool (not limited to T0)
 - Per-tool input shaper profiles
@@ -161,11 +168,14 @@ Common recoverable scenarios:
 
 Unlike systems that require T0 as the reference tool, this implementation allows any tool to be the initial reference. All other tools are calibrated relative to whichever tool you choose.
 
+**Important:** The initial/reference tool always has a Z-offset of exactly 0.0 – it is the baseline against which all other tools are measured. This is enforced in the code to prevent configuration errors.
+
 This is useful when:
 
 - T0 is not ideal for calibration
-- You want to use a specific tool as your "master"
+- You want to use a specific tool as your "master" reference
 - Your tool layout makes another tool more convenient
+- You need to recalibrate using a different tool as the baseline
 
 ---
 
@@ -285,6 +295,7 @@ Located in `klipper/extras/`:
 - **`tc_config_helper.py`** – Configuration parsing and validation
 - **`tc_beacon_capture.py`** – Beacon probe integration for Z calibration
 - **`tc_save_config_value.py`** – SAVE_CONFIG integration for storing offsets
+- **`beacon_temp_override.py`** – Nozzle thermal expansion compensation for Z-offset accuracy
 
 ### Klipper Configs & Macros
 
@@ -318,7 +329,10 @@ This project works with several external Klipper plugins:
 
 **Recommended:**
 
-- **[kTAMV](https://github.com/TypQxQ/kTAMV)** – Camera-based XY calibration (primary method)
+- **[kTAMV (Enhanced Fork)](https://github.com/PrintStructor/kTAMV)** – Camera-based XY calibration (primary method)
+  - Improved 3-stage detection with sub-pixel precision (5µm vs 20µm)
+  - Temporal smoothing and outlier rejection for stable measurements
+  - Based on [TypQxQ/kTAMV](https://github.com/TypQxQ/kTAMV) with significant accuracy improvements
 - **[Shake&Tune](https://github.com/Frix-x/klippain-shaketune)** – For input shaper tuning
 - **[TMC Autotune](https://github.com/andrewmcgr/klipper_tmc_autotune)** – For automatic TMC driver tuning
 - **[Klipper LED Effect](https://github.com/julianschill/klipper-led_effect)** – For LED status effects
@@ -503,13 +517,15 @@ Start here:
 
 **Configuration:**
 
-- [CONFIGURATION.md](docs/CONFIGURATION.md) – All configuration options  
-- [CALIBRATION.md](docs/CALIBRATION.md) – XY and Z offset calibration  
+- [CONFIGURATION.md](docs/CONFIGURATION.md) – All configuration options
+- [CALIBRATION.md](docs/CALIBRATION.md) – XY and Z offset calibration
+- [THERMAL_COMPENSATION.md](docs/THERMAL_COMPENSATION.md) – Nozzle thermal expansion compensation guide
 - [ATOM Example Config](examples/atom-tc-6tool/README.md) – Complete 6-tool setup
 
 **Reference:**
 
 - [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) – Common issues and solutions
+- [FAQ.md](docs/FAQ.md) – Frequently asked questions
 - [UPGRADE.md](docs/UPGRADE.md) – Upgrading from previous versions
 - [CHANGELOG.md](CHANGELOG.md) – Version history
 - [CONTRIBUTING.md](CONTRIBUTING.md) – How to contribute
@@ -556,7 +572,12 @@ This project builds on work by many contributors in the Klipper toolchanger comm
 
 **Calibration Tools:**
 
-- **[kTAMV](https://github.com/TypQxQ/kTAMV)** by TypQxQ – Camera-based XY offset calibration using computer vision. kTAMV enables precise nozzle alignment through a USB camera and is the primary XY calibration method in this project. Licensed under GPL-3.0.
+- **[kTAMV (Enhanced Fork)](https://github.com/PrintStructor/kTAMV)** – Camera-based XY offset calibration with improved detection accuracy
+  - Based on **[kTAMV](https://github.com/TypQxQ/kTAMV)** by TypQxQ (GPL-3.0)
+  - Enhanced with 3-stage radial symmetry detection for sub-pixel precision
+  - Temporal smoothing and outlier rejection for stable measurements
+  - 15 FPS @ 1280×720 resolution (vs 2 FPS @ 640×480 original)
+  - Primary XY calibration method in this project
 - **[NUDGE](https://github.com/zruncho3d/nudge)** by Zruncho – Physical probe-based XY calibration. Used as backup method when camera is unavailable.
 
 **Hardware Design:**
@@ -649,6 +670,6 @@ See [LICENSE](LICENSE) for complete terms.
 
 ---
 
-**Last updated:** 2026-01-10
+**Last updated:** 2026-01-17
 **Version:** 1.1.0
 **Maintained by:** PrintStructor
