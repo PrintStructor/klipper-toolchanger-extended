@@ -18,8 +18,8 @@ Before starting calibration, ensure:
 - Printer homed successfully (`G28`)
 
 ✅ **Software:**
-- [kTAMV Enhanced Fork](https://github.com/PrintStructor/kTAMV) installed
-- kTAMV server running: `sudo systemctl status ktamv`
+- [TAXY](https://github.com/PrintStructor/TAXY) installed (recommended) or [kTAMV](https://github.com/TypQxQ/kTAMV)
+- TAXY server running: `sudo systemctl status taxy` (or kTAMV: `sudo systemctl status ktamv`)
 - Beacon probe configured: `BEACON_CALIBRATE` completed
 - All config files from this directory included in `printer.cfg`
 
@@ -44,7 +44,7 @@ Total Time: 3-4 hours
 ```
 
 **Methods used:**
-- **XY Calibration:** kTAMV (camera-based, sub-pixel precision)
+- **XY Calibration:** TAXY (AI-based, ~5µm precision) or kTAMV (OpenCV, legacy)
 - **Z Calibration:** Beacon (contact probe, 150°C reference)
 - **Thermal Calibration:** Beacon (multi-temperature measurement)
 
@@ -99,7 +99,7 @@ T0  # Return to T0
 
 ### 2.1 Configure LED Lighting
 
-For best kTAMV accuracy, use optimal lighting:
+For best TAXY/kTAMV accuracy, use optimal lighting:
 
 ```gcode
 STATUS_KTAMV
@@ -129,7 +129,7 @@ KTAMV_CALIB_CAMERA
 1. Moves nozzle to calibration position
 2. Takes two measurements with known movement distance
 3. Calculates mm/pixel ratio
-4. Saves to kTAMV server config
+4. Saves to TAXY/kTAMV server config
 
 Expected output:
 ```
@@ -169,7 +169,7 @@ For each tool (T0-T5) as initial tool:
   2. Set as initial tool
   3. For each other tool:
      - Switch to tool
-     - Run kTAMV_FIND_NOZZLE_CENTER
+     - Run TAXY_FIND_NOZZLE_CENTER (or kTAMV_FIND_NOZZLE_CENTER)
      - Record XY offset
   4. Save offsets to config
   5. Cooldown
@@ -184,7 +184,7 @@ Total: 6 × 5 = 30 measurements
 **What you'll see:**
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Batch XY Calibration (kTAMV)
+Batch XY Calibration (TAXY)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Using T0 as initial tool...
   T1: X=-0.0970, Y=0.2180
@@ -555,7 +555,7 @@ SAVE_TOOL_Z_ADJUSTMENTS
 
 ### Summary of What Was Calibrated
 
-✅ **Camera:** mm/pixel ratio for kTAMV
+✅ **Camera:** mm/pixel ratio for TAXY/kTAMV
 ✅ **XY Offsets:** All tool-to-tool alignments
 ✅ **Z Offsets:** All tool-to-tool height differences
 ✅ **Thermal Coefficients:** Nozzle expansion rates per tool
@@ -603,7 +603,7 @@ nozzle_expansion_coefficient_t1 = 0.00056
 
 ## Troubleshooting
 
-### kTAMV Can't Find Nozzle
+### TAXY/kTAMV Can't Find Nozzle
 
 **Causes:**
 - Bad lighting (chamber LEDs ON, nozzle LEDs OFF)
@@ -614,7 +614,7 @@ nozzle_expansion_coefficient_t1 = 0.00056
 **Solutions:**
 ```gcode
 STATUS_KTAMV          # Chamber OFF, Nozzle RED
-KTAMV_START_PREVIEW   # Check camera view
+TAXY_START_PREVIEW    # Check camera view (or KTAMV_START_PREVIEW)
 # Adjust camera focus manually
 # Ensure dark matte bed surface
 ```

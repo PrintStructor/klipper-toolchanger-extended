@@ -22,7 +22,8 @@ The examples assume:
 - [**ATOM TC-6 Calibration Guide**](../examples/atom-tc-6tool/CALIBRATION_GUIDE.md)
 
 The ATOM implementation uses enhanced calibration methods:
-- **kTAMV** (camera-based XY calibration) - primary method
+- **TAXY** (AI-based XY calibration) - primary method (~5µm precision)
+- **kTAMV** (OpenCV-based XY calibration) - legacy/fallback method
 - **NUDGE** (physical probe) - backup method
 - **Batch calibration** - full matrix XY/Z calibration in one run
 - **Per-tool babystepping** - live Z adjustments during prints
@@ -315,27 +316,39 @@ The simplest verification is a **multi‑tool first layer test**:
 
 For comprehensive calibration, v1.1.0 introduces **batch calibration macros** that perform a full calibration matrix in one run.
 
-### 6.1. XY Batch Calibration – `KTAMV_CALIBRATE_ALL_TOOLS_XY`
+### 6.1. XY Batch Calibration – Camera-based
 
-This macro uses **kTAMV** (camera-based calibration) to measure XY offsets for all tools:
+#### Option A: TAXY (Recommended)
+
+This macro uses **TAXY** (AI-based calibration) to measure XY offsets for all tools:
+
+```gcode
+TAXY_CALIBRATE_ALL_TOOLS_XY
+```
+
+**Prerequisites:**
+- TAXY installed and configured ([TAXY by PrintStructor](https://github.com/PrintStructor/TAXY))
+- Camera positioned to view nozzle tip
+- All tools capable of reliable pickup/dropoff
+
+#### Option B: kTAMV (Legacy)
+
+Alternative using OpenCV blob detection:
 
 ```gcode
 KTAMV_CALIBRATE_ALL_TOOLS_XY
 ```
 
-**What it does:**
+**Prerequisites:**
+- kTAMV installed and configured ([kTAMV by TypQxQ](https://github.com/TypQxQ/kTAMV))
+
+**What batch calibration does:**
 
 - Uses each tool as initial/reference tool in sequence
 - Measures all other tools relative to it
 - For 6 tools: 6 × 5 = 30 offset measurements
 - Averages results for highest accuracy
 - Automatically saves offsets via `SAVE_CONFIG`
-
-**Prerequisites:**
-
-- kTAMV installed and configured ([kTAMV by TypQxQ](https://github.com/TypQxQ/kTAMV))
-- Camera positioned to view nozzle tip
-- All tools capable of reliable pickup/dropoff
 
 **When to use:**
 
@@ -695,8 +708,9 @@ If Z offsets look okay but first layer quality still differs:
 For maximum accuracy, use batch calibration:
 
 ```gcode
-# Full XY matrix (requires kTAMV)
-KTAMV_CALIBRATE_ALL_TOOLS_XY
+# Full XY matrix (requires TAXY or kTAMV)
+TAXY_CALIBRATE_ALL_TOOLS_XY    # AI-based (recommended)
+# or: KTAMV_CALIBRATE_ALL_TOOLS_XY  # OpenCV-based (legacy)
 
 # Full Z matrix (requires Beacon)
 BEACON_CALIBRATE_ALL_TOOLS_Z

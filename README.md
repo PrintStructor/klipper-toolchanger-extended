@@ -15,7 +15,7 @@
 
 **Version:** 1.1.0 | **Author:** PrintStructor | **License:** GPL-3.0
 **Based on:** [viesturz/klipper-toolchanger](https://github.com/viesturz/klipper-toolchanger)
-> Latest stable: **v1.1.0** – batch calibration, per-tool babystepping, kTAMV integration
+> Latest stable: **v1.1.0** – batch calibration, per-tool babystepping, TAXY/kTAMV integration
 
 > Klipper toolchanger extension with additional safety features, error recovery, and a complete working configuration for 6-tool VORON printers with ATOM toolheads.
 
@@ -38,7 +38,8 @@ This is an extension of [viesturz/klipper-toolchanger](https://github.com/viestu
 - LED status integration
 
 **Calibration Workflows:**
-- **kTAMV** (camera-based) for precise XY offset measurement – primary method
+- **TAXY** (YOLOv8 AI-based) for precise XY offset measurement – primary method (~5µm precision)
+- **kTAMV** (OpenCV blob detection) – legacy method for systems without GPU
 - **NUDGE** probe for XY calibration – backup method when camera unavailable
 - **Beacon** contact probe for Z offset calibration
 - Batch calibration macros (all tools in one run)
@@ -290,7 +291,7 @@ Located in `klipper/extras/`:
 - **`tool.py`** – Tool state management and operations
 - **`rounded_path.py`** – Smooth movement paths for toolchanges
 - **`tools_calibrate.py`** – XY/Z offset calibration workflows (NUDGE)
-- **`tool_xy_calibration.py`** – XY offset saving for kTAMV integration
+- **`tool_xy_calibration.py`** – XY offset saving for TAXY/kTAMV integration
 - **`tool_z_adjust.py`** – Per-tool Z babystepping (live adjustments)
 - **`tc_config_helper.py`** – Configuration parsing and validation
 - **`tc_beacon_capture.py`** – Beacon probe integration for Z calibration
@@ -329,10 +330,13 @@ This project works with several external Klipper plugins:
 
 **Recommended:**
 
-- **[kTAMV (Enhanced Fork)](https://github.com/PrintStructor/kTAMV)** – Camera-based XY calibration (primary method)
-  - Improved 3-stage detection with sub-pixel precision (5µm vs 20µm)
-  - Temporal smoothing and outlier rejection for stable measurements
-  - Based on [TypQxQ/kTAMV](https://github.com/TypQxQ/kTAMV) with significant accuracy improvements
+- **[TAXY](https://github.com/PrintStructor/TAXY)** – AI-based XY calibration (primary method)
+  - YOLOv8 nozzle detection with ~5µm precision
+  - Works reliably with various lighting conditions and nozzle types
+  - Requires Python environment with ultralytics (GPU recommended but not required)
+- **[kTAMV](https://github.com/TypQxQ/kTAMV)** – OpenCV-based XY calibration (legacy/fallback)
+  - Traditional blob detection, works on any system
+  - Good alternative when TAXY is not available
 - **[Shake&Tune](https://github.com/Frix-x/klippain-shaketune)** – For input shaper tuning
 - **[TMC Autotune](https://github.com/andrewmcgr/klipper_tmc_autotune)** – For automatic TMC driver tuning
 - **[Klipper LED Effect](https://github.com/julianschill/klipper-led_effect)** – For LED status effects
@@ -572,13 +576,12 @@ This project builds on work by many contributors in the Klipper toolchanger comm
 
 **Calibration Tools:**
 
-- **[kTAMV (Enhanced Fork)](https://github.com/PrintStructor/kTAMV)** – Camera-based XY offset calibration with improved detection accuracy
-  - Based on **[kTAMV](https://github.com/TypQxQ/kTAMV)** by TypQxQ (GPL-3.0)
-  - Enhanced with 3-stage radial symmetry detection for sub-pixel precision
-  - Temporal smoothing and outlier rejection for stable measurements
-  - 15 FPS @ 1280×720 resolution (vs 2 FPS @ 640×480 original)
-  - Primary XY calibration method in this project
-- **[NUDGE](https://github.com/zruncho3d/nudge)** by Zruncho – Physical probe-based XY calibration. Used as backup method when camera is unavailable.
+- **[TAXY](https://github.com/PrintStructor/TAXY)** – AI-based XY offset calibration (primary method)
+  - YOLOv8 nozzle detection with ~5µm precision
+  - Robust detection across lighting conditions and nozzle types
+  - Custom-trained model for toolchanger nozzle detection
+- **[kTAMV](https://github.com/TypQxQ/kTAMV)** by TypQxQ – OpenCV blob detection (legacy/fallback, GPL-3.0)
+- **[NUDGE](https://github.com/zruncho3d/nudge)** by Zruncho – Physical probe-based XY calibration (backup when camera unavailable)
 
 **Hardware Design:**
 
@@ -590,7 +593,7 @@ This project builds on work by many contributors in the Klipper toolchanger comm
 
 - Additional safety features, monitoring, batch calibration, per-tool babystepping, and complete configuration by PrintStructor
 
-This project is licensed under **GPL-3.0** (same as Klipper and kTAMV).
+This project is licensed under **GPL-3.0** (same as Klipper).
 See [LICENSE](LICENSE) for full terms.
 
 ---

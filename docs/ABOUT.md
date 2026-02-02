@@ -14,7 +14,7 @@ An extension of [viesturz/klipper-toolchanger](https://github.com/viesturz/klipp
 | **Two-stage pickup verification** | ❌ | ❌ | ✅ |
 | **Tool presence monitoring** | ❌ | ❌ | ✅ |
 | **Heater shutoff on tool loss** | ❌ | ❌ | ✅ |
-| **kTAMV camera calibration** | ❌ | ❌ | ✅ |
+| **TAXY AI calibration** | ❌ | ❌ | ✅ |
 | **NUDGE probe calibration** | ❌ | ❌ | ✅ |
 | **Batch calibration (full matrix)** | ❌ | ❌ | ✅ |
 | **Per-tool Z babystepping** | ❌ | ❌ | ✅ |
@@ -52,7 +52,8 @@ An extension of [viesturz/klipper-toolchanger](https://github.com/viesturz/klipp
 - Automatic heater shutoff on tool loss
 
 **Calibration (v1.1.0+):**
-- kTAMV camera-based XY calibration (primary)
+- TAXY AI-based XY calibration (primary, ~5µm precision)
+- kTAMV OpenCV-based XY calibration (legacy/fallback)
 - NUDGE physical probe (backup)
 - Batch calibration for full offset matrix
 - Per-tool Z babystepping during prints
@@ -91,7 +92,8 @@ Designed for:
 ## Credits
 
 - **[viesturz/klipper-toolchanger](https://github.com/viesturz/klipper-toolchanger)** – Core framework
-- **[kTAMV](https://github.com/TypQxQ/kTAMV)** by TypQxQ – Camera calibration (GPL-3.0)
+- **[TAXY](https://github.com/PrintStructor/TAXY)** – AI-based XY calibration (primary)
+- **[kTAMV](https://github.com/TypQxQ/kTAMV)** by TypQxQ – OpenCV calibration (legacy, GPL-3.0)
 - **[NUDGE](https://github.com/zruncho3d/nudge)** by Zruncho – Physical probe calibration
 - **ATOM Toolhead** by Alex/APDMachine
 

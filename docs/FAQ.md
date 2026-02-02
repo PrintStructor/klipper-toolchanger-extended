@@ -25,7 +25,7 @@ It's an enhanced fork of the original klipper-toolchanger by viesturz, featuring
 - **ATOM toolhead** integration
 - **Per-tool input shaper**
 - **LED effects** and KNOMI display support
-- **kTAMV + NUDGE** calibration integration
+- **TAXY/kTAMV + NUDGE** calibration integration
 - **Batch calibration** for full offset matrix (v1.1.0+)
 - **Per-tool Z babystepping** during prints (v1.1.0+)
 
@@ -398,20 +398,22 @@ tar -czf ~/config_backup_$(date +%Y%m%d).tar.gz ~/printer_data/config/
 
 ---
 
-### What is kTAMV and how does it compare to NUDGE?
+### What are TAXY, kTAMV, and NUDGE?
 
-**kTAMV** ([by TypQxQ](https://github.com/TypQxQ/kTAMV)) uses a camera and computer vision to measure nozzle positions.
+Three methods for XY calibration:
 
-| Method | kTAMV | NUDGE |
-|--------|-------|-------|
-| **Hardware** | USB camera | Physical probe |
-| **Accuracy** | Very high | High |
-| **Speed** | Fast (automated) | Slower (manual nudging) |
-| **Ease** | Fully automatic | Semi-manual |
-| **Setup** | Camera mounting, lighting | Probe installation |
+| Method | TAXY | kTAMV | NUDGE |
+|--------|------|-------|-------|
+| **Technology** | YOLOv8 AI | OpenCV blob | Physical probe |
+| **Hardware** | USB camera + GPU | USB camera | Probe |
+| **Accuracy** | ~5µm | ~20µm | ~10µm |
+| **Speed** | Fast | Fast | Slower |
+| **Reliability** | Excellent | Good | Very good |
+| **Setup** | Camera + Python env | Camera + lighting | Probe mount |
 
 **Recommendation:**
-- **kTAMV** as primary method (faster, fully automated)
+- **TAXY** as primary method ([GitHub](https://github.com/PrintStructor/TAXY)) – best accuracy, most robust
+- **kTAMV** as legacy fallback ([GitHub](https://github.com/TypQxQ/kTAMV)) – works without GPU
 - **NUDGE** as backup when camera unavailable
 
 ---
@@ -422,7 +424,8 @@ tar -czf ~/config_backup_$(date +%Y%m%d).tar.gz ~/printer_data/config/
 
 **Commands:**
 ```gcode
-KTAMV_CALIBRATE_ALL_TOOLS_XY   # Full XY matrix
+TAXY_CALIBRATE_ALL_TOOLS_XY    # Full XY matrix (AI-based, recommended)
+KTAMV_CALIBRATE_ALL_TOOLS_XY   # Full XY matrix (OpenCV, legacy)
 BEACON_CALIBRATE_ALL_TOOLS_Z   # Full Z matrix
 ```
 

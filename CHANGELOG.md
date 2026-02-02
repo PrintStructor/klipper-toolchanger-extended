@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **TAXY Integration** – AI-based XY calibration as primary method
+  - YOLOv8 nozzle detection with ~5µm precision
+  - More robust than OpenCV blob detection across lighting conditions
+  - [TAXY GitHub](https://github.com/PrintStructor/TAXY)
+  - kTAMV remains as legacy/fallback option
+
 ### Fixed
 - **Initial Tool Z-Offset Bug** (`toolchanger.py`)
   - Initial/reference tool now correctly gets Z-offset of 0.0

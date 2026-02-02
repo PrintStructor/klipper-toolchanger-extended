@@ -11,7 +11,7 @@ This directory contains a complete, production-tested configuration for a 6-tool
 - 6× ATOM toolheads (~236g each with extruder)
 - Lightweight shuttle (~52g) with CPAP cooling
 - Beacon RevH probe for Z-offset calibration
-- USB camera for kTAMV XY calibration
+- USB camera for TAXY/kTAMV XY calibration
 - CAN bus communication (EBB36/42 boards)
 - Per-tool filament sensors
 - LED status effects (chamber + per-tool)
@@ -23,7 +23,7 @@ This directory contains a complete, production-tested configuration for a 6-tool
 - Per-tool Z babystepping
 - Nozzle thermal expansion compensation
 - Batch calibration (XY + Z for all tools)
-- kTAMV camera-based XY calibration (enhanced fork)
+- TAXY AI-based XY calibration (primary, ~5µm precision)
 
 ---
 
@@ -35,10 +35,10 @@ atom-tc-6tool/
 ├── CALIBRATION_GUIDE.md         ← Step-by-step calibration workflow
 ├── printer.cfg                  ← Main printer config
 ├── macros.cfg                   ← High-level user macros (PRINT_START, etc.)
-├── ktamv-macros.cfg             ← kTAMV integration macros
+├── ktamv-macros.cfg             ← TAXY/kTAMV integration macros
 ├── mainsail.cfg                 ← Mainsail UI integration
 ├── variables.cfg                ← Persistent variables (offsets, coefficients)
-├── crowsnest.conf               ← Camera configuration for kTAMV
+├── crowsnest.conf               ← Camera configuration for TAXY/kTAMV
 └── atom/                        ← Toolchanger-specific configs
     ├── toolchanger.cfg          ← Core toolchanger setup
     ├── toolchanger_macros.cfg   ← Pickup/dropoff/recovery macros
@@ -63,7 +63,7 @@ atom-tc-6tool/
    - USB camera installed and focused
 
 2. **Required Klipper extensions installed:**
-   - [kTAMV (Enhanced Fork)](https://github.com/PrintStructor/kTAMV)
+   - [TAXY](https://github.com/PrintStructor/TAXY) (recommended) or [kTAMV](https://github.com/TypQxQ/kTAMV)
    - [Beacon Klipper](https://github.com/beacon3d/beacon_klipper)
    - [klipper-toolchanger-extended](https://github.com/PrintStructor/klipper-toolchanger-extended)
 
@@ -144,7 +144,7 @@ dropoff_position: 3.0,347.5          # Dock exit position
 
 **Test pickup/dropoff positions manually before running macros!**
 
-### 2. Configure Camera (kTAMV)
+### 2. Configure Camera (TAXY/kTAMV)
 
 Edit `crowsnest.conf`:
 ```ini
@@ -281,9 +281,10 @@ Adjustments are RAM-based until saved.
 
 Calibrate all tools in one run instead of manually doing each:
 
-**XY Calibration (requires kTAMV):**
+**XY Calibration (requires TAXY or kTAMV):**
 ```gcode
-KTAMV_CALIBRATE_ALL_TOOLS_XY
+TAXY_CALIBRATE_ALL_TOOLS_XY    # AI-based (recommended)
+# or: KTAMV_CALIBRATE_ALL_TOOLS_XY  # OpenCV-based (legacy)
 ```
 - Each tool becomes initial tool
 - Measures all other tools relative to it
@@ -309,7 +310,7 @@ Visual feedback during toolchanger operations:
 - **STATUS_HEATING** - Tool heating (orange)
 - **STATUS_PRINTING** - Active printing (green)
 - **STATUS_ERROR** - Error state (red flashing)
-- **STATUS_KTAMV** - kTAMV calibration (chamber OFF, nozzle RED)
+- **STATUS_KTAMV** - Camera calibration (chamber OFF, nozzle RED)
 
 Configured in `atom/tc_led_effects.cfg`
 
@@ -426,9 +427,9 @@ CLEAR_NOZZLE_TEMP_OFFSET
 
 **Check:**
 - Camera focused correctly
-- kTAMV server running: `sudo systemctl status ktamv`
+- TAXY server running: `sudo systemctl status taxy` (or kTAMV: `sudo systemctl status ktamv`)
 - LED lighting (chamber OFF, nozzle RED for best contrast)
-- Camera calibration: `KTAMV_CALIB_CAMERA`
+- Camera calibration: `TAXY_CALIB_CAMERA` (or `KTAMV_CALIB_CAMERA`)
 
 ### Z-Offset Inconsistent
 

@@ -196,9 +196,21 @@ without mechanical issues.
 
 ## 7. XY Calibration
 
-Once basic pickup and dropoff work, you have two calibration methods:
+Once basic pickup and dropoff work, you have three calibration methods:
 
-### Option A: kTAMV (Camera-based) – Recommended
+### Option A: TAXY (AI-based) – Recommended
+
+If you have TAXY installed ([TAXY by PrintStructor](https://github.com/PrintStructor/TAXY)):
+
+```gcode
+G28
+SET_INITIAL_TOOL TOOL=0
+TAXY_CALIBRATE_ALL_TOOLS_XY   # Full batch calibration
+```
+
+This uses YOLOv8 AI to automatically measure all XY offsets with ~5µm precision.
+
+### Option B: kTAMV (OpenCV-based) – Legacy
 
 If you have kTAMV installed ([kTAMV by TypQxQ](https://github.com/TypQxQ/kTAMV)):
 
@@ -208,11 +220,11 @@ SET_INITIAL_TOOL TOOL=0
 KTAMV_CALIBRATE_ALL_TOOLS_XY   # Full batch calibration
 ```
 
-This uses computer vision to automatically measure all XY offsets.
+This uses OpenCV blob detection to measure XY offsets (fallback for systems without TAXY).
 
-### Option B: NUDGE (Physical probe)
+### Option C: NUDGE (Physical probe)
 
-If you don't have kTAMV, use the manual nudge workflow:
+If you don't have TAXY or kTAMV, use the manual nudge workflow:
 
 ```gcode
 G28
