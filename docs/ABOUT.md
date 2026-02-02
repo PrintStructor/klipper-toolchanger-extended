@@ -93,7 +93,7 @@ Designed for:
 
 - **[viesturz/klipper-toolchanger](https://github.com/viesturz/klipper-toolchanger)** – Core framework
 - **[TAXY](https://github.com/PrintStructor/TAXY)** – AI-based XY calibration (primary)
-- **[kTAMV](https://github.com/TypQxQ/kTAMV)** by TypQxQ – OpenCV calibration (legacy, GPL-3.0)
+- **[kTAMV](https://github.com/PrintStructor/kTAMV)** by TypQxQ – OpenCV calibration (legacy, GPL-3.0)
 - **[NUDGE](https://github.com/zruncho3d/nudge)** by Zruncho – Physical probe calibration
 - **ATOM Toolhead** by Alex/APDMachine
 

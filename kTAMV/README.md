@@ -1,6 +1,6 @@
 # kTAMV Enhanced Detection
 
-Verbesserte Nozzle-Erkennung für [kTAMV](https://github.com/TypQxQ/kTAMV) mit besserer Zuverlässigkeit und korrektem Seitenverhältnis.
+Verbesserte Nozzle-Erkennung für [kTAMV](https://github.com/PrintStructor/kTAMV) mit besserer Zuverlässigkeit und korrektem Seitenverhältnis.
 
 ## Verbesserungen
 
@@ -127,5 +127,5 @@ pkill -f ktamv_server.py && nohup ~/ktamv-env/bin/python ~/kTAMV/server/ktamv_se
 
 ## Credits
 
-- Original kTAMV von [TypQxQ](https://github.com/TypQxQ/kTAMV)
+- Original kTAMV von [TypQxQ](https://github.com/PrintStructor/kTAMV)
 - Detection-Verbesserungen von PrintStructor

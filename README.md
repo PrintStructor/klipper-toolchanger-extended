@@ -334,7 +334,7 @@ This project works with several external Klipper plugins:
   - YOLOv8 nozzle detection with ~5µm precision
   - Works reliably with various lighting conditions and nozzle types
   - Requires Python environment with ultralytics (GPU recommended but not required)
-- **[kTAMV](https://github.com/TypQxQ/kTAMV)** – OpenCV-based XY calibration (legacy/fallback)
+- **[kTAMV](https://github.com/PrintStructor/kTAMV)** – OpenCV-based XY calibration (legacy/fallback)
   - Traditional blob detection, works on any system
   - Good alternative when TAXY is not available
 - **[Shake&Tune](https://github.com/Frix-x/klippain-shaketune)** – For input shaper tuning
@@ -580,7 +580,7 @@ This project builds on work by many contributors in the Klipper toolchanger comm
   - YOLOv8 nozzle detection with ~5µm precision
   - Robust detection across lighting conditions and nozzle types
   - Custom-trained model for toolchanger nozzle detection
-- **[kTAMV](https://github.com/TypQxQ/kTAMV)** by TypQxQ – OpenCV blob detection (legacy/fallback, GPL-3.0)
+- **[kTAMV](https://github.com/PrintStructor/kTAMV)** by TypQxQ – OpenCV blob detection (legacy/fallback, GPL-3.0)
 - **[NUDGE](https://github.com/zruncho3d/nudge)** by Zruncho – Physical probe-based XY calibration (backup when camera unavailable)
 
 **Hardware Design:**

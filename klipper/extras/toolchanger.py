@@ -1029,6 +1029,7 @@ class Toolchanger:
             else:
                 # No XY offsets available
                 self.gcode.run_script_from_command("SET_GCODE_OFFSET X=0 Y=0 ABSOLUTE=1")
+                self.gcode.respond_info("T%d XY-offset: no stored offsets, using X=0 Y=0" % tool.tool_number)
 
         except Exception as e:
             self.gcode.respond_info("Error setting offset: %s" % str(e))

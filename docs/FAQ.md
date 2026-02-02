@@ -413,7 +413,7 @@ Three methods for XY calibration:
 
 **Recommendation:**
 - **TAXY** as primary method ([GitHub](https://github.com/PrintStructor/TAXY)) – best accuracy, most robust
-- **kTAMV** as legacy fallback ([GitHub](https://github.com/TypQxQ/kTAMV)) – works without GPU
+- **kTAMV** as legacy fallback ([GitHub](https://github.com/PrintStructor/kTAMV)) – works without GPU
 - **NUDGE** as backup when camera unavailable
 
 ---

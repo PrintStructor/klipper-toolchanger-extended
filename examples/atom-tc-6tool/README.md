@@ -35,7 +35,7 @@ atom-tc-6tool/
 ├── CALIBRATION_GUIDE.md         ← Step-by-step calibration workflow
 ├── printer.cfg                  ← Main printer config
 ├── macros.cfg                   ← High-level user macros (PRINT_START, etc.)
-├── ktamv-macros.cfg             ← TAXY/kTAMV integration macros
+├── ktamv-macros.cfg             ← kTAMV integration macros (legacy)
 ├── mainsail.cfg                 ← Mainsail UI integration
 ├── variables.cfg                ← Persistent variables (offsets, coefficients)
 ├── crowsnest.conf               ← Camera configuration for TAXY/kTAMV
@@ -63,7 +63,7 @@ atom-tc-6tool/
    - USB camera installed and focused
 
 2. **Required Klipper extensions installed:**
-   - [TAXY](https://github.com/PrintStructor/TAXY) (recommended) or [kTAMV](https://github.com/TypQxQ/kTAMV)
+   - [TAXY](https://github.com/PrintStructor/TAXY) (recommended) or [kTAMV](https://github.com/PrintStructor/kTAMV)
    - [Beacon Klipper](https://github.com/beacon3d/beacon_klipper)
    - [klipper-toolchanger-extended](https://github.com/PrintStructor/klipper-toolchanger-extended)
 

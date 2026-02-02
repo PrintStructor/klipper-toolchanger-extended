@@ -212,7 +212,7 @@ This uses YOLOv8 AI to automatically measure all XY offsets with ~5µm precision
 
 ### Option B: kTAMV (OpenCV-based) – Legacy
 
-If you have kTAMV installed ([kTAMV by TypQxQ](https://github.com/TypQxQ/kTAMV)):
+If you have kTAMV installed ([kTAMV by TypQxQ](https://github.com/PrintStructor/kTAMV)):
 
 ```gcode
 G28

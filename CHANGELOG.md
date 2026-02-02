@@ -68,7 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### kTAMV Integration (Camera-based XY Calibration)
 - Primary XY calibration method using computer vision
-- Integration with [kTAMV](https://github.com/TypQxQ/kTAMV) by TypQxQ
+- Integration with [kTAMV](https://github.com/PrintStructor/kTAMV) by TypQxQ
 - Step-by-step and batch calibration workflows
 - Automatic offset saving to printer.cfg
 

@@ -340,7 +340,7 @@ KTAMV_CALIBRATE_ALL_TOOLS_XY
 ```
 
 **Prerequisites:**
-- kTAMV installed and configured ([kTAMV by TypQxQ](https://github.com/TypQxQ/kTAMV))
+- kTAMV installed and configured ([kTAMV by TypQxQ](https://github.com/PrintStructor/kTAMV))
 
 **What batch calibration does:**
 

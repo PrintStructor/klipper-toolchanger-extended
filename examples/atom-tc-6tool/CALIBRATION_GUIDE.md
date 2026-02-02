@@ -18,7 +18,7 @@ Before starting calibration, ensure:
 - Printer homed successfully (`G28`)
 
 ✅ **Software:**
-- [TAXY](https://github.com/PrintStructor/TAXY) installed (recommended) or [kTAMV](https://github.com/TypQxQ/kTAMV)
+- [TAXY](https://github.com/PrintStructor/TAXY) installed (recommended) or [kTAMV](https://github.com/PrintStructor/kTAMV)
 - TAXY server running: `sudo systemctl status taxy` (or kTAMV: `sudo systemctl status ktamv`)
 - Beacon probe configured: `BEACON_CALIBRATE` completed
 - All config files from this directory included in `printer.cfg`
