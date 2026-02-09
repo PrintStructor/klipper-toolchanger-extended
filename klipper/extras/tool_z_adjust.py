@@ -102,7 +102,14 @@ class ToolZAdjust:
             except:
                 global_offset = 0.0
 
-            total_offset = new_offset + global_offset
+            # Get current thermal offset (must preserve it during babystepping)
+            try:
+                thermal_vars = self.printer.lookup_object('gcode_macro _NOZZLE_TEMP_OFFSET_VARS')
+                thermal_offset = thermal_vars.variables.get('current_offset', 0.0)
+            except:
+                thermal_offset = 0.0
+
+            total_offset = new_offset + global_offset + thermal_offset
             # Use _BASE_SET_GCODE_OFFSET to avoid recursive macro call
             self.gcode.run_script_from_command('_BASE_SET_GCODE_OFFSET Z=%.4f MOVE=1' % total_offset)
 
