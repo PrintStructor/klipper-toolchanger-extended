@@ -86,7 +86,7 @@ class Tool:
         self.tool_number = config.getint('tool_number', -1, minval=0)
 
         # Z-offset matrix (dynamically sized based on toolchanger config)
-        max_tool_count = self.toolchanger.params.get('max_tool_count', 6)
+        max_tool_count = self.toolchanger.params.get('params_max_tool_count', 6)
         self.z_offsets = {}
         for i in range(max_tool_count):
             if i != self.tool_number:

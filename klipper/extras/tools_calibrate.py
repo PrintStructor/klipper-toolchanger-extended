@@ -167,7 +167,7 @@ class ToolsCalibrate:
         
         # Clear ALL offset dictionaries in the tool object itself (for runtime)
         # This ensures that during calibration, all toolchanges use 0 offsets
-        max_tool_count = self.printer.lookup_object('toolchanger').params.get('max_tool_count', 6)
+        max_tool_count = self.printer.lookup_object('toolchanger').params.get('params_max_tool_count', 6)
         for i in range(max_tool_count):
             if i != self.initial_tool.tool_number:
                 self.initial_tool.xy_offsets[i] = [0.0, 0.0]
@@ -201,7 +201,7 @@ class ToolsCalibrate:
         if current_tool == self.initial_tool:
             self.gcode.run_script_from_command("SET_GCODE_OFFSET X=0 Y=0 Z=0")
             # Save only XY offsets to 0.00 for initial tool (Z-offsets are preserved)
-            max_tool_count = self.printer.lookup_object('toolchanger').params.get('max_tool_count', 6)
+            max_tool_count = self.printer.lookup_object('toolchanger').params.get('params_max_tool_count', 6)
             configfile = self.printer.lookup_object('configfile')
             for i in range(max_tool_count):
                 if i != self.initial_tool.tool_number:

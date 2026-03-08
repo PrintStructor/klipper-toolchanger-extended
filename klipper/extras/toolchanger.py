@@ -554,7 +554,7 @@ class Toolchanger:
             return
         
         loaded_count = len(new_initial.xy_offsets)
-        max_tool_count = self.params.get('max_tool_count', 6)
+        max_tool_count = self.params.get('params_max_tool_count', 6)
         if loaded_count > 0:
             self.gcode.respond_info(f"Offsets for T{new_initial_num} (as initial tool, other tools are relative to it):")
             for i in range(max_tool_count):
