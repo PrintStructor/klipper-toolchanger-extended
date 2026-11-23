@@ -35,9 +35,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   THERMAL_COMPENSATION and the example CALIBRATION_GUIDE)
 
 ### Removed
-- **TAXY and kTAMV camera calibration**: XY calibration is done with the NUDGE probe only.
-  Removed `kTAMV/`, `taxy-macros.cfg`, `ktamv-macros.cfg`, the TAXY macros in
-  `tool_calibration.cfg`, `tool_xy_calibration.py` and the kTAMV step of `install.sh`
+- **TAXY and kTAMV camera calibration from the example config**: the example calibrates
+  XY with the NUDGE probe only. Removed `kTAMV/`, `taxy-macros.cfg`, `ktamv-macros.cfg`,
+  the TAXY macros in `tool_calibration.cfg` and the kTAMV step of `install.sh`.
+  `tool_xy_calibration.py` stays (deprecated), so existing camera setups keep working.
+
+### Upgrade notes
+- **Your own config is not touched by an update.** Camera calibration (TAXY/kTAMV)
+  keeps working with the macros you already have; `[tool_xy_calibration]`,
+  `SAVE_TOOL_XY_OFFSET` and `SET_CALIBRATION_MODE` are still there.
+- **New safety check:** a tool change is refused while Klipper's tool and the
+  detection sensors disagree. Fix the shuttle, then run `INITIALIZE_TOOLCHANGER`.
+- **Detection debounce** (`debounce_delay` in `[tool]`) needs Klipper v0.13.0 or newer;
+  on older Klipper the pins work as before, without debounce.
+- **NUDGE crash backup** to `variables.cfg` is only written when `[save_variables]`
+  is configured.
+- If you **symlinked** `examples/atom-tc-6tool` into your config folder instead of
+  copying it, an update replaces your config with the author's current one
+  (pins, CAN UUIDs, offsets). Copy the files instead of linking them.
 
 ### Fixed
 - **Initial Tool Z-Offset Bug** (`toolchanger.py`)

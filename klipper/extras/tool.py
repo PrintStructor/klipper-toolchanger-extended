@@ -75,7 +75,13 @@ class Tool:
         self.detect_state = toolchanger.DETECT_UNAVAILABLE
         if detect_pin_name:
             buttons = self.printer.load_object(config, 'buttons')
-            buttons.register_debounce_button(detect_pin_name, self._handle_detect, config)
+            if hasattr(buttons, 'register_debounce_button'):
+                # Klipper >= v0.13.0: honours debounce_delay in [tool]
+                buttons.register_debounce_button(detect_pin_name, self._handle_detect, config)
+            else:
+                # Older Klipper: no debounce support, plain button as before
+                config.getfloat('debounce_delay', 0., minval=0.)
+                buttons.register_buttons([detect_pin_name], self._handle_detect)
             self.detect_state = toolchanger.DETECT_ABSENT
 
         self.extruder_stepper_name = self._config_get(config, 'extruder_stepper', None)
