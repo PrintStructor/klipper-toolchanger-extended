@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Trimmed-mean probing** for NUDGE (`samples_discard` / `SAMPLES_DISCARD`)
 - **Crash-safe NUDGE results**: every XY offset is written to `variables.cfg` immediately
 - **Tool state check**: no tool change while Klipper and the detection sensors disagree
+- **Toolchanger panel for Mainsail** (`examples/atom-tc-6tool/mainsail/toolchanger-panel.html`):
+  live Klipper-vs-sensor tool state, per-tool detection, temperatures, Z offsets
 - Example config synced with the author's printer: nozzle wipe, bed fans,
   input shaper macros for closed-loop X/Y, sensorless homing via `virtual_endstop`
 

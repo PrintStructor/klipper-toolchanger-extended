@@ -23,6 +23,7 @@ atom-tc-6tool/
 ├── bedfans.cfg                  bed fan control
 ├── helix_macros.cfg             HelixScreen display macros (author-specific)
 ├── mainsail.cfg, crowsnest.conf web UI and camera
+├── mainsail/toolchanger-panel.html  live toolchanger status panel for Mainsail
 ├── ouroboros_xy.cfg             closed-loop X/Y sections (experimental)
 ├── printer_closedloop_xy.cfg    printer.cfg variant for closed-loop X/Y
 └── atom/
@@ -38,6 +39,19 @@ atom-tc-6tool/
     ├── tc_led_effects.cfg       LED status
     └── knomi.cfg                KNOMI displays (optional)
 ```
+
+## Toolchanger panel for Mainsail
+
+`mainsail/toolchanger-panel.html` shows live what `DEBUG_TOOL_DETECTION` prints:
+the tool Klipper expects next to the tool the sensors report (red on mismatch),
+every tool's dock/shuttle state, temperatures and Z offsets.
+
+1. Copy it into the Mainsail folder:
+   `cp mainsail/toolchanger-panel.html ~/mainsail/`
+2. Keep it across Mainsail updates: add to `[update_manager mainsail]` in
+   `moonraker.conf`: `persistent_files: toolchanger-panel.html`
+3. In Mainsail: Settings → Webcams → add a webcam, service **HTML/iFrame**,
+   URL `/toolchanger-panel.html`, aspect ratio e.g. `5:2`.
 
 ## Most used commands
 
