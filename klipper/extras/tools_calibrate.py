@@ -226,9 +226,12 @@ class ToolsCalibrate:
         # Persist immediately to variables.cfg as crash/disconnect recovery
         # SAVE_VARIABLE writes to disk instantly without Klipper restart
         # Store as tuple (x, y) - consistent with Klipper's save_variables format
-        var_name = f"nudge_xy_{self.initial_tool.tool_number}_{current_tool.tool_number}"
-        var_value = f"({x_offset:.4f},{y_offset:.4f})"
-        self.gcode.run_script_from_command(f"SAVE_VARIABLE VARIABLE={var_name} VALUE={var_value}")
+        # Only when [save_variables] is configured; without it the
+        # calibration works as before, just without the crash backup.
+        if self.printer.lookup_object('save_variables', None) is not None:
+            var_name = f"nudge_xy_{self.initial_tool.tool_number}_{current_tool.tool_number}"
+            var_value = f"({x_offset:.4f},{y_offset:.4f})"
+            self.gcode.run_script_from_command(f"SAVE_VARIABLE VARIABLE={var_name} VALUE={var_value}")
 
         # Apply ONLY XY-offsets, clear Z runtime offset (Z-offsets in config are preserved)
         self.gcode.run_script_from_command(

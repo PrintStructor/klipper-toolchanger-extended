@@ -118,6 +118,10 @@ diff ~/printer_data/config/atom/tool_calibration.cfg \
      ~/klipper-toolchanger-extended/examples/atom-tc-6tool/atom/tool_calibration.cfg
 ```
 
+Read the [changelog](../CHANGELOG.md) before updating; it lists behaviour
+changes under **Upgrade notes**. Copy the example files into your config folder;
+do not symlink the examples directory, or an update replaces your configuration.
+
 Never copy the example `printer.cfg` or `variables.cfg` over your own: they
 contain the author's calibration values. Make a backup before larger changes:
 
