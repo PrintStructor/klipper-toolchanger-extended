@@ -177,8 +177,8 @@ class ToolsCalibrate:
         configfile = self.printer.lookup_object('configfile')
         for i in range(max_tool_count):
             if i != self.initial_tool.tool_number:
-                configfile.set(self.initial_tool.name, f't{i}_xy_offset', "0.000000, 0.000000")
-        
+                configfile.set(self.initial_tool.name, f't{i}_xy_offset', "0.0000, 0.0000")
+
         self.gcode.respond_info("Initial tool %s sensor location at X=%.6f, Y=%.6f, Z=%.6f"
                             % (self.initial_tool.name, self.last_result[0], 
                                self.last_result[1], self.last_result[2]))
@@ -205,7 +205,7 @@ class ToolsCalibrate:
             configfile = self.printer.lookup_object('configfile')
             for i in range(max_tool_count):
                 if i != self.initial_tool.tool_number:
-                    configfile.set(self.initial_tool.name, f't{i}_xy_offset', "0.000000, 0.000000")
+                    configfile.set(self.initial_tool.name, f't{i}_xy_offset', "0.0000, 0.0000")
             self.gcode.respond_info(f"Initial tool {self.initial_tool.name}: XY offsets set to 0.00, Z runtime offset cleared (Z-offsets in config preserved)")
             return
             
@@ -221,15 +221,22 @@ class ToolsCalibrate:
         # Store in initial tool's section for consistency with Z-offsets
         configfile = self.printer.lookup_object('configfile')
         configfile.set(self.initial_tool.name, f't{current_tool.tool_number}_xy_offset',
-                      f"{x_offset:.6f}, {y_offset:.6f}")
-        
+                      f"{x_offset:.4f}, {y_offset:.4f}")
+
+        # Persist immediately to variables.cfg as crash/disconnect recovery
+        # SAVE_VARIABLE writes to disk instantly without Klipper restart
+        # Store as tuple (x, y) - consistent with Klipper's save_variables format
+        var_name = f"nudge_xy_{self.initial_tool.tool_number}_{current_tool.tool_number}"
+        var_value = f"({x_offset:.4f},{y_offset:.4f})"
+        self.gcode.run_script_from_command(f"SAVE_VARIABLE VARIABLE={var_name} VALUE={var_value}")
+
         # Apply ONLY XY-offsets, clear Z runtime offset (Z-offsets in config are preserved)
         self.gcode.run_script_from_command(
             f"SET_GCODE_OFFSET X={x_offset:.6f} Y={y_offset:.6f} Z=0")
-        
+
         # Store all three for reference (Z is display-only)
         self.last_result = [x_offset, y_offset, z_offset]
-        
+
         # Enhanced output with Z for comparison
         self.gcode.respond_info(
             f"Tool {current_tool.name} offsets relative to {self.initial_tool.name}:\n"
@@ -344,6 +351,12 @@ class PrinterProbeMultiAxis:
 
         # Multi-sample support (for improved accuracy)
         self.sample_count = config.getint('samples', 1, minval=1)
+        # Number of extreme samples to discard from EACH end before averaging.
+        # Total probes taken = samples + 2 * samples_discard. Sorting the
+        # samples and dropping the highest and lowest yields a trimmed mean,
+        # which is outlier resistant without throwing away the remaining data
+        # the way a plain median does.
+        self.samples_discard = config.getint('samples_discard', 0, minval=0)
         self.sample_retract_dist = config.getfloat('sample_retract_dist', 2.,
                                                    above=0.)
         atypes = {'median': 'median', 'average': 'average'}
@@ -446,26 +459,50 @@ class PrinterProbeMultiAxis:
                                        self.samples_retries, minval=0)
         samples_result = gcmd.get("SAMPLES_RESULT", self.samples_result)
 
+        samples_discard = gcmd.get_int("SAMPLES_DISCARD",
+                                       self.samples_discard, minval=0)
+        total_count = sample_count + 2 * samples_discard
+
         probe_start = self.printer.lookup_object('toolhead').get_position()
         retries = 0
-        positions = []
-        while len(positions) < sample_count:
-            # Probe position
-            pos = self._probe(speed, axis, sense, max_distance)
-            positions.append(pos)
-            # Check samples tolerance
-            axis_positions = [p[axis] for p in positions]
-            if max(axis_positions) - min(axis_positions) > samples_tolerance:
-                if retries >= samples_retries:
-                    raise gcmd.error("Probe samples exceed samples_tolerance")
-                gcmd.respond_info("Probe samples exceed tolerance. Retrying...")
-                retries += 1
-                positions = []
-            # Retract
-            if len(positions) < sample_count:
-                liftpos = probe_start
-                liftpos[axis] = pos[axis] - sense * sample_retract_dist
-                self._move(liftpos, lift_speed)
+        while True:
+            positions = []
+            while len(positions) < total_count:
+                pos = self._probe(speed, axis, sense, max_distance)
+                positions.append(pos)
+                # Retract between samples
+                if len(positions) < total_count:
+                    liftpos = list(probe_start)
+                    liftpos[axis] = pos[axis] - sense * sample_retract_dist
+                    self._move(liftpos, lift_speed)
+
+            # Trim the extreme samples, then judge the remaining core.
+            # Checking tolerance on the trimmed core rather than on every
+            # raw sample means a single outlier is removed instead of
+            # forcing a full retry, which would otherwise bias the accepted
+            # set toward whichever cluster happens to repeat.
+            axis_sorted = sorted(positions, key=(lambda p: p[axis]))
+            if samples_discard:
+                core = axis_sorted[samples_discard:total_count - samples_discard]
+            else:
+                core = axis_sorted
+            core_vals = [p[axis] for p in core]
+            core_spread = max(core_vals) - min(core_vals)
+
+            if core_spread <= samples_tolerance:
+                break
+            if retries >= samples_retries:
+                raise gcmd.error("Probe samples exceed samples_tolerance")
+            gcmd.respond_info(
+                "Probe samples exceed tolerance (core spread %.4f of %d,"
+                " tolerance %.4f). Retrying..."
+                % (core_spread, total_count, samples_tolerance))
+            retries += 1
+            liftpos = list(probe_start)
+            liftpos[axis] = positions[-1][axis] - sense * sample_retract_dist
+            self._move(liftpos, lift_speed)
+
+        positions = core
         # Calculate and return result
         if samples_result == 'median':
             return self._calc_median(positions, axis)

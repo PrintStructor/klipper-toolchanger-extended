@@ -1,7 +1,7 @@
 # ATOM Toolhead System
 
-**Designer:** Creator of the Reaper Toolhead  
-**Project:** Exclusive design for Klipper Toolchanger Extended  
+**Design:** Created together with Alex (APDMachine, creator of the Reaper Toolhead), developed further by PrintStructor  
+**Shuttle:** Compatible with the Fysetc CNC shuttle for Stealthchanger  
 **Version:** 1.0.0
 
 ---
@@ -164,8 +164,8 @@ QUERY_FILAMENT_SENSOR SENSOR=T0_filament_sensor
 
 ## Credits
 
-**Design:** Creator of the Reaper Toolhead  
-**Integration & Testing:** PrintStructor  
+**Design:** Alex (APDMachine) and PrintStructor  
+**Further development, integration & testing:** PrintStructor  
 **Project:** [Klipper Toolchanger Extended](https://github.com/PrintStructor/klipper-toolchanger-extended)
 
 ---

@@ -98,8 +98,8 @@ class Toolchanger:
         self.tool_numbers = []  # Ordered list of registered tool numbers.
         self.tool_names = []    # Tool names, in the same order as numbers.
         self.error_message = ''
-        self.calibration_mode = False      # Z-offsets disabled (for Beacon + kTAMV)
-        self.xy_calibration_mode = False   # XY-offsets disabled (only for kTAMV)
+        self.calibration_mode = False      # Z-offsets disabled during calibration
+        self.xy_calibration_mode = False   # XY-offsets disabled during camera calibration
         self.next_change_id = 1
         self.current_change_id = -1
         self.last_change_restore_position = None
@@ -242,9 +242,10 @@ class Toolchanger:
     def _report_nonfatal(self, gcmd, message):
         """Report a non-fatal error without raising."""
         try:
-            self.gcode.respond_info("!! Toolchanger Error: %s" % message)
-            if gcmd is not None:
-                gcmd.respond_info("!! Toolchanger Error: %s" % message)
+            # Once, and as a real error line ("!!" via respond_raw) so it shows
+            # up red in Mainsail. gcode.respond_info plus gcmd.respond_info used
+            # to print every message twice into the same console.
+            self.gcode.respond_raw("!! Toolchanger Error: %s" % message)
         except Exception:
             pass
         return False
@@ -585,11 +586,11 @@ class Toolchanger:
 
         Parameters:
             ENABLE=1/0  - Enable/disable Z-offset calibration mode
-            XY=1/0      - Also disable XY-offsets (for kTAMV calibration)
+            XY=1/0      - Also disable XY-offsets (for camera-based calibration)
 
         Usage:
             SET_CALIBRATION_MODE ENABLE=1        # Beacon Z-cal: XY on, Z off
-            SET_CALIBRATION_MODE ENABLE=1 XY=1   # kTAMV XY-cal: XY off, Z off
+            SET_CALIBRATION_MODE ENABLE=1 XY=1   # camera XY-cal: XY off, Z off
             SET_CALIBRATION_MODE ENABLE=0        # Normal mode: XY on, Z on
         """
         enable = gcmd.get_int('ENABLE', 0)
@@ -600,7 +601,7 @@ class Toolchanger:
 
         if self.calibration_mode:
             if self.xy_calibration_mode:
-                self.gcode.respond_info("⚙️ Calibration mode ENABLED - XY+Z offsets disabled (kTAMV mode)")
+                self.gcode.respond_info("⚙️ Calibration mode ENABLED - XY+Z offsets disabled (XY mode)")
             else:
                 self.gcode.respond_info("⚙️ Calibration mode ENABLED - Z-offsets disabled (Beacon mode)")
         else:
@@ -639,6 +640,15 @@ class Toolchanger:
                 self._configure_toolhead_for_tool(select_tool)
                 self.run_gcode('after_change_gcode', select_tool.after_change_gcode, extra_context)
                 self._set_tool_gcode_offset(select_tool)
+            elif (self.has_detection and self.detected_tool is None
+                    and self.active_tool is not None):
+                # Sensors report an empty shuttle but Klipper still holds a
+                # tool (removed by hand). Forget it, so INITIALIZE_TOOLCHANGER
+                # fixes the state without a FIRMWARE_RESTART.
+                self.gcode.respond_info(
+                    "Shuttle reported empty, clearing stale state of %s"
+                    % (self.active_tool.name,))
+                self._configure_toolhead_for_tool(None)
 
             if self.require_tool_present and self.active_tool is None:
                 self._process_error(
@@ -665,6 +675,26 @@ class Toolchanger:
         if self.status != STATUS_READY:
             self._report_nonfatal(gcmd, "Cannot select tool, toolchanger status is %s, reason: %s" % (self.status, self.error_message))
             self._pause_print()
+            return
+
+        # Safety: Klipper's idea of the mounted tool must match the sensors
+        # before anything moves. Otherwise a dropoff runs with an empty
+        # shuttle into an occupied dock, a pickup happens with a tool still
+        # attached, or "already selected" silently accepts an empty shuttle.
+        if self.has_detection and self.detected_tool != self.active_tool:
+            expected = self.active_tool.name if self.active_tool else "none"
+            actual = self.detected_tool.name if self.detected_tool else "none"
+            hint = "INITIALIZE_TOOLCHANGER"
+            self._report_nonfatal(gcmd,
+                "Tool state mismatch: Klipper expects %s, sensors report %s. "
+                "Nothing was moved. Check the shuttle, then run %s."
+                % (expected, actual, hint))
+            # Only pause a real print. Outside a print PAUSE would trip the
+            # tool loss handler (red LEDs, "tool loss during print").
+            ps = self.printer.lookup_object('print_stats', None)
+            if ps is not None and ps.get_status(
+                    self.printer.get_reactor().monotonic())['state'] == 'printing':
+                self._pause_print()
             return
 
         if self.active_tool == tool:
@@ -1010,7 +1040,7 @@ class Toolchanger:
                 self.gcode.run_script_from_command('SET_GCODE_OFFSET Z=%.3f ABSOLUTE=1' % (total_offset,))
 
             # --- XY-Offset Logic ---
-            # In XY calibration mode (kTAMV), do NOT apply XY-offsets
+            # In XY calibration mode, do NOT apply XY-offsets
             if self.xy_calibration_mode:
                 self.gcode.run_script_from_command("SET_GCODE_OFFSET X=0 Y=0 ABSOLUTE=1")
                 self.gcode.respond_info("⚙️ XY calibration mode: XY-offset set to 0 for T%d" % tool.tool_number)

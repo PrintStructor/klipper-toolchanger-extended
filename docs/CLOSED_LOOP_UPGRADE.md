@@ -28,7 +28,7 @@ into position angle targets internally.
 | Encoder | None | 1000-line optical (6-wire) |
 | Microsteps | 32 (physical) | 2 (virtual — servo in hardware) |
 | Steps/rev | 200 | 4096 (virtual) |
-| Sensorless homing | Yes (StallGuard) | No (not functional yet) |
+| Sensorless homing | Yes (StallGuard) | Yes (PID output limit flags via virtual_endstop) |
 | autotune_tmc | Yes | No (use TMC_TUNE_PID instead) |
 | Brake resistors | Not needed | **MANDATORY** |
 
@@ -163,10 +163,31 @@ Adjust based on motor behavior:
 
 ### Homing Changes
 
-Since sensorless homing is not functional with the TMC4671, you need a physical
-endstop on the X-axis. The Y-axis already uses a physical endstop in the
-standard configuration. Update your homing macros if they rely on StallGuard
-behavior (e.g., `homing_retract_dist` should be > 0 for physical endstops).
+The TMC4671 driver supports sensorless homing via a `virtual_endstop` mechanism.
+Instead of StallGuard (which is TMC2209/5160-specific), the TMC4671 detects stall
+through its own PID output limit flags (`PID_V_OUTPUT_LIMIT`, `PID_X_ERRSUM_LIMIT`)
+in the `STATUS_FLAGS` register. When the motor is pushed against the frame, the
+servo can no longer reach the commanded position and these flags trigger.
+
+**To enable sensorless homing:**
+```ini
+[stepper_x]
+endstop_pin: tmc4671 stepper_x:virtual_endstop
+homing_retract_dist: 0
+homing_speed: 20          # Start slow during initial tuning
+
+[tmc4671 stepper_x]
+diag_pin: ^ouroboros:PE8  # ⚠️ Verify from Ouroboros wiring docs
+homing_current: 1.5       # Reduced current during homing
+```
+
+**Tuning sensorless homing:**
+1. Start with `homing_speed: 10` and confirm the axis stops before hitting the frame
+2. If it doesn't trigger: lower `homing_current` (more stall sensitivity)
+3. If it triggers too early: raise `homing_current` or check the `homing_mask` entries
+4. Increase speed gradually once reliable triggering is confirmed
+
+Physical endstop remains the fallback option (see `ouroboros_xy.cfg` OPTION B).
 
 ### Tool Change Speed
 
@@ -241,7 +262,7 @@ must be above those peaks.
 
 ## Known Limitations
 
-- **Sensorless homing:** Not functional with TMC4671 driver (as of March 2026)
+- **Sensorless homing:** Supported via `virtual_endstop` (PID output limit flags) — requires tuning
 - **Beta driver:** The TMC4671 Klipper driver is lightly tested
 - **Digital Hall encoders:** Work but give poor results — use optical encoders
 - **No autotune_tmc:** The Klipper TMC autotune plugin does not support TMC4671
