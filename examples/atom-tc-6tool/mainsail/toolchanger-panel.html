@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Toolchanger</title>
+<!--
+  Toolchanger status panel for Mainsail.
+  Live view of what DEBUG_TOOL_DETECTION prints: Klipper's tool vs. the
+  sensors, per-tool detection, temperatures, offsets.
+
+  Install: copy to ~/mainsail/toolchanger-panel.html and keep it across
+  Mainsail updates with  persistent_files: toolchanger-panel.html  in
+  [update_manager mainsail] of moonraker.conf.
+  Mainsail: Settings > Webcams > add, Service "HTML/iFrame",
+  URL /toolchanger-panel.html, aspect ratio e.g. 2:1.
+  Optional URL parameter: ?moonraker=host:port (default: same host).
+-->
+<style>
+  :root {
+    --bg: #1e1e1e;
+    --card: #2a2a2a;
+    --card-2: #333;
+    --line: #3d3d3d;
+    --text: #e6e6e6;
+    --muted: #9a9a9a;
+    --ok: #4caf50;
+    --warn: #ffb300;
+    --bad: #f44336;
+    --info: #2196f3;
+    --hot: #ff7043;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 13px/1.35 Roboto, "Segoe UI", system-ui, -apple-system, sans-serif;
+    padding: 10px;
+    overflow: auto;
+  }
+  .top {
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    margin-bottom: 8px;
+  }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 999px; padding: 3px 10px; white-space: nowrap;
+  }
+  .chip b { font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); }
+  .dot.bad { background: var(--bad); } .dot.info { background: var(--info); }
+  .spacer { flex: 1; }
+  .conn { color: var(--muted); font-size: 11px; }
+
+  .alert {
+    display: none; margin-bottom: 8px; padding: 8px 10px; border-radius: 6px;
+    background: rgba(244, 67, 54, .15); border: 1px solid var(--bad); color: #ffcdd2;
+  }
+  .alert.show { display: block; }
+  .alert b { color: #fff; }
+
+  .compare {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;
+  }
+  .box {
+    background: var(--card); border: 1px solid var(--line); border-radius: 6px;
+    padding: 6px 10px;
+  }
+  .box .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  .box .value { font-size: 18px; font-weight: 600; }
+  .box.match { border-color: var(--ok); }
+  .box.mismatch { border-color: var(--bad); }
+
+  .tools {
+    display: grid; gap: 6px;
+    grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  }
+  .tool {
+    background: var(--card); border: 1px solid var(--line); border-radius: 6px;
+    padding: 7px 9px; position: relative;
+  }
+  .tool.active { border-color: var(--ok); box-shadow: inset 0 0 0 1px var(--ok); }
+  .tool.conflict { border-color: var(--bad); box-shadow: inset 0 0 0 1px var(--bad); }
+  .tool .head { display: flex; align-items: center; justify-content: space-between; }
+  .tool .name { font-size: 16px; font-weight: 700; }
+  .badge {
+    font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+    padding: 1px 6px; border-radius: 4px; background: var(--card-2); color: var(--muted);
+  }
+  .badge.on { background: rgba(76, 175, 80, .2); color: #a5d6a7; }
+  .badge.bad { background: rgba(244, 67, 54, .2); color: #ffcdd2; }
+  .row { display: flex; justify-content: space-between; color: var(--muted); margin-top: 3px; }
+  .row span:last-child { color: var(--text); font-variant-numeric: tabular-nums; }
+  .bar { height: 4px; background: var(--card-2); border-radius: 2px; margin-top: 4px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--muted); transition: width .4s; }
+  .bar i.heating { background: var(--hot); }
+  .bar i.at { background: var(--ok); }
+  .foot { color: var(--muted); font-size: 11px; margin-top: 8px; }
+  .foot code { color: var(--text); }
+</style>
+</head>
+<body>
+  <div class="top">
+    <span class="chip"><span class="dot" id="tcDot"></span>Toolchanger <b id="tcStatus">–</b></span>
+    <span class="chip"><span class="dot" id="psDot"></span>Druck <b id="psState">–</b></span>
+    <span class="chip">Global Z <b id="globalZ">–</b></span>
+    <span class="chip" id="calChip" hidden><span class="dot warn"></span><b>Kalibriermodus</b></span>
+    <span class="spacer"></span>
+    <span class="conn" id="conn">verbinde…</span>
+  </div>
+
+  <div class="alert" id="alert"></div>
+
+  <div class="compare">
+    <div class="box" id="boxKlipper"><div class="label">Klipper erwartet</div><div class="value" id="klipperTool">–</div></div>
+    <div class="box" id="boxSensor"><div class="label">Sensoren melden</div><div class="value" id="sensorTool">–</div></div>
+  </div>
+
+  <div class="tools" id="tools"></div>
+
+  <div class="foot" id="foot"></div>
+
+<script>
+(() => {
+  const params = new URLSearchParams(location.search);
+  const host = params.get('moonraker') || location.host;
+  const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + host + '/websocket';
+
+  const state = {};          // merged Klipper object status
+  let toolCount = 0;
+  let extruders = [];
+  let ws, reqId = 0, reconnectTimer;
+
+  const $ = (id) => document.getElementById(id);
+  const fmtTool = (n) => (n === null || n === undefined || n < 0) ? 'keins' : 'T' + n;
+  const num = (v, d = 1) => (typeof v === 'number' ? v.toFixed(d) : '–');
+
+  function merge(status) {
+    for (const [obj, fields] of Object.entries(status || {})) {
+      state[obj] = Object.assign(state[obj] || {}, fields);
+    }
+  }
+
+  function send(method, params) {
+    const id = ++reqId;
+    ws.send(JSON.stringify({ jsonrpc: '2.0', method, params, id }));
+    return id;
+  }
+
+  // Step 1: ask which tools/extruders exist, step 2: subscribe to them.
+  let listId = 0, subId = 0;
+  function start() {
+    listId = send('printer.objects.query', { objects: { toolchanger: ['tool_names', 'tool_numbers', 'available_extruders'] } });
+  }
+
+  function subscribe(tc) {
+    const names = tc.tool_names || [];
+    extruders = tc.available_extruders || [];
+    toolCount = names.length;
+    const objects = {
+      toolchanger: ['status', 'tool_number', 'detected_tool_number', 'has_detection', 'tool_numbers'],
+      print_stats: ['state'],
+      'gcode_macro globals': ['global_z_offset', 'toolchanger_calibration_mode'],
+    };
+    names.forEach((n) => { objects[n] = ['tool_number', 'detect_state', 'active', 'extruder', 'z_offsets', 'xy_offsets']; });
+    extruders.forEach((e) => { objects[e] = ['temperature', 'target']; });
+    buildTiles(names);
+    subId = send('printer.objects.subscribe', { objects });
+  }
+
+  function buildTiles(names) {
+    const wrap = $('tools');
+    wrap.innerHTML = '';
+    names.forEach((n, i) => {
+      const el = document.createElement('div');
+      el.className = 'tool';
+      el.id = 'tool-' + i;
+      el.innerHTML = `
+        <div class="head"><span class="name">T${i}</span><span class="badge" data-k="badge">–</span></div>
+        <div class="row"><span>Temp</span><span data-k="temp">–</span></div>
+        <div class="bar"><i data-k="bar"></i></div>
+        <div class="row"><span data-k="zlabel">Z-Offset</span><span data-k="z">–</span></div>`;
+      wrap.appendChild(el);
+    });
+  }
+
+  function render() {
+    const tc = state.toolchanger || {};
+    const ps = (state.print_stats || {}).state;
+    const glob = state['gcode_macro globals'] || {};
+
+    // Top chips
+    const st = tc.status || '–';
+    $('tcStatus').textContent = st;
+    $('tcDot').className = 'dot ' + ({ ready: 'ok', changing: 'info', error: 'bad', uninitialized: 'warn' }[st] || '');
+    $('psState').textContent = ps || '–';
+    $('psDot').className = 'dot ' + ({ printing: 'info', paused: 'warn', error: 'bad', complete: 'ok' }[ps] || '');
+    $('globalZ').textContent = typeof glob.global_z_offset === 'number' ? glob.global_z_offset.toFixed(3) + ' mm' : '–';
+    $('calChip').hidden = !glob.toolchanger_calibration_mode;
+
+    // Klipper vs sensors
+    const expected = tc.tool_number;
+    const detected = tc.detected_tool_number;
+    const hasDet = !!tc.has_detection;
+    const mismatch = hasDet && expected !== undefined && detected !== undefined && expected !== detected
+      && !(st === 'uninitialized' && expected === -1);
+    $('klipperTool').textContent = st === 'uninitialized' ? 'nicht initialisiert' : fmtTool(expected);
+    $('sensorTool').textContent = hasDet ? fmtTool(detected) : 'keine Sensoren';
+    $('boxKlipper').className = 'box ' + (mismatch ? 'mismatch' : (hasDet && st !== 'uninitialized' ? 'match' : ''));
+    $('boxSensor').className = $('boxKlipper').className;
+
+    // Tiles
+    const onShuttle = [];
+    for (let i = 0; i < toolCount; i++) {
+      const t = state['tool T' + i] || {};
+      const el = $('tool-' + i);
+      if (!el) continue;
+      const det = t.detect_state === 1;
+      if (det) onShuttle.push(i);
+      const ex = state[t.extruder] || {};
+      const badge = el.querySelector('[data-k="badge"]');
+      badge.textContent = det ? 'Shuttle' : 'Dock';
+      badge.className = 'badge' + (det ? ' on' : '');
+      el.classList.toggle('active', !!t.active && det);
+      el.classList.toggle('conflict', (!!t.active && !det && hasDet) || (det && expected >= 0 && expected !== i));
+
+      const temp = ex.temperature, target = ex.target;
+      el.querySelector('[data-k="temp"]').textContent =
+        num(temp) + (target ? ' / ' + num(target, 0) : '') + ' °C';
+      const bar = el.querySelector('[data-k="bar"]');
+      const pct = target ? Math.min(100, (temp / target) * 100) : Math.min(100, (temp || 0) / 3);
+      bar.style.width = pct + '%';
+      bar.className = target ? (Math.abs(temp - target) <= 3 ? 'at' : 'heating') : '';
+
+      // Z offset of this tool relative to the active (or detected) tool
+      const ref = expected >= 0 ? expected : detected;
+      const refTool = state['tool T' + ref] || {};
+      let z = '–';
+      if (ref === i) z = 'Referenz';
+      else if (refTool.z_offsets && refTool.z_offsets[String(i)] !== undefined) {
+        const v = refTool.z_offsets[String(i)];
+        z = (v >= 0 ? '+' : '') + v.toFixed(3);
+      }
+      el.querySelector('[data-k="z"]').textContent = z;
+      el.querySelector('[data-k="zlabel"]').textContent = ref >= 0 ? 'Z zu T' + ref : 'Z-Offset';
+    }
+
+    // Alert
+    const alert = $('alert');
+    let msg = '';
+    if (hasDet && onShuttle.length > 1) {
+      msg = `<b>Mehrere Werkzeuge erkannt:</b> ${onShuttle.map((n) => 'T' + n).join(', ')}. Ein Sensor klemmt oder ein Werkzeug drückt im Dock auf seinen Schalter.`;
+    } else if (mismatch) {
+      msg = `<b>Widerspruch:</b> Klipper erwartet ${fmtTool(expected)}, die Sensoren melden ${fmtTool(detected)}. Werkzeugwechsel sind gesperrt. Shuttle prüfen, dann <code>INITIALIZE_TOOLCHANGER</code>.`;
+    } else if (st === 'error') {
+      msg = '<b>Toolchanger im Fehlerzustand.</b> Ursache in der Konsole prüfen, dann <code>INITIALIZE_TOOLCHANGER</code>.';
+    }
+    alert.innerHTML = msg;
+    alert.classList.toggle('show', !!msg);
+
+    $('foot').innerHTML = st === 'uninitialized'
+      ? 'Der Toolchanger initialisiert sich beim ersten Werkzeugbefehl.'
+      : '';
+  }
+
+  let renderQueued = false;
+  function queueRender() {
+    if (renderQueued) return;
+    renderQueued = true;
+    requestAnimationFrame(() => { renderQueued = false; render(); });
+  }
+
+  function setConn(text) { $('conn').textContent = text; }
+
+  function connect() {
+    clearTimeout(reconnectTimer);
+    try { ws = new WebSocket(wsUrl); } catch (e) { return retry(); }
+    ws.onopen = () => { setConn('verbunden'); start(); };
+    ws.onclose = () => { setConn('getrennt, verbinde neu…'); retry(); };
+    ws.onerror = () => { try { ws.close(); } catch (e) {} };
+    ws.onmessage = (ev) => {
+      let m;
+      try { m = JSON.parse(ev.data); } catch (e) { return; }
+      if (m.id === listId && m.result) {
+        subscribe((m.result.status || {}).toolchanger || {});
+      } else if (m.id === subId && m.result) {
+        merge(m.result.status); queueRender();
+      } else if (m.id === listId && m.error) {
+        setConn('Klipper nicht bereit');
+        setTimeout(start, 3000);
+      } else if (m.method === 'notify_status_update') {
+        merge(m.params[0]); queueRender();
+      } else if (m.method === 'notify_klippy_ready') {
+        setConn('verbunden'); start();
+      } else if (m.method === 'notify_klippy_disconnected' || m.method === 'notify_klippy_shutdown') {
+        setConn('Klipper ' + (m.method.endsWith('shutdown') ? 'im Shutdown' : 'getrennt'));
+      }
+    };
+  }
+
+  function retry() { clearTimeout(reconnectTimer); reconnectTimer = setTimeout(connect, 3000); }
+
+  connect();
+})();
+</script>
+</body>
+</html>
