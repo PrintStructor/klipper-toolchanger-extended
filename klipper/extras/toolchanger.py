@@ -98,8 +98,8 @@ class Toolchanger:
         self.tool_numbers = []  # Ordered list of registered tool numbers.
         self.tool_names = []    # Tool names, in the same order as numbers.
         self.error_message = ''
-        self.calibration_mode = False      # Z-offsets disabled (for Beacon + kTAMV)
-        self.xy_calibration_mode = False   # XY-offsets disabled (only for kTAMV)
+        self.calibration_mode = False      # Z-offsets disabled during calibration
+        self.xy_calibration_mode = False   # XY-offsets disabled during camera calibration
         self.next_change_id = 1
         self.current_change_id = -1
         self.last_change_restore_position = None
@@ -586,11 +586,11 @@ class Toolchanger:
 
         Parameters:
             ENABLE=1/0  - Enable/disable Z-offset calibration mode
-            XY=1/0      - Also disable XY-offsets (for kTAMV calibration)
+            XY=1/0      - Also disable XY-offsets (for camera-based calibration)
 
         Usage:
             SET_CALIBRATION_MODE ENABLE=1        # Beacon Z-cal: XY on, Z off
-            SET_CALIBRATION_MODE ENABLE=1 XY=1   # kTAMV XY-cal: XY off, Z off
+            SET_CALIBRATION_MODE ENABLE=1 XY=1   # camera XY-cal: XY off, Z off
             SET_CALIBRATION_MODE ENABLE=0        # Normal mode: XY on, Z on
         """
         enable = gcmd.get_int('ENABLE', 0)
@@ -601,7 +601,7 @@ class Toolchanger:
 
         if self.calibration_mode:
             if self.xy_calibration_mode:
-                self.gcode.respond_info("⚙️ Calibration mode ENABLED - XY+Z offsets disabled (kTAMV mode)")
+                self.gcode.respond_info("⚙️ Calibration mode ENABLED - XY+Z offsets disabled (XY mode)")
             else:
                 self.gcode.respond_info("⚙️ Calibration mode ENABLED - Z-offsets disabled (Beacon mode)")
         else:
@@ -1040,7 +1040,7 @@ class Toolchanger:
                 self.gcode.run_script_from_command('SET_GCODE_OFFSET Z=%.3f ABSOLUTE=1' % (total_offset,))
 
             # --- XY-Offset Logic ---
-            # In XY calibration mode (kTAMV), do NOT apply XY-offsets
+            # In XY calibration mode, do NOT apply XY-offsets
             if self.xy_calibration_mode:
                 self.gcode.run_script_from_command("SET_GCODE_OFFSET X=0 Y=0 ABSOLUTE=1")
                 self.gcode.respond_info("⚙️ XY calibration mode: XY-offset set to 0 for T%d" % tool.tool_number)
