@@ -1,739 +1,199 @@
-# Calibration Guide
+# Calibration
 
-This document explains how to calibrate a multi‑tool printer using
-`klipper-toolchanger-extended`, focusing on:
+Every tool sits slightly differently on the shuttle. Calibration measures how far
+each nozzle is from the **reference tool** in X, Y and Z, so all tools print onto
+the same spot.
 
-- XY alignment between tools
-- Z offsets for all tools
-- Batch calibration for full offset matrix (v1.1.0+)
-- Per-tool Z babystepping during prints (v1.1.0+)
-- When and how to re‑calibrate
+Order for a new printer:
 
-The examples assume:
+1. [XY offsets](#xy-offsets): camera (TAXY) or NUDGE probe
+2. [Z offsets](#z-offsets): Beacon contact probe
+3. [Thermal compensation](#thermal-compensation): once per tool
+4. [Check with a test print](#checking-the-result), fine-tune with
+   [babystepping](#z-babystepping-during-a-print)
 
-- Reference tool = **T0**
-- Probe = **Beacon** (concept also works with other probes)
+All macros below are in `atom/tool_calibration.cfg`, `atom/nudge_ring.cfg` and
+`atom/beacon_diagnostics.cfg`.
 
----
+## Before you calibrate
 
-## 📌 ATOM TC-6 Users
+- All tools change reliably ([Installation](INSTALLATION.md#4-first-tool-change)).
+- Nozzles are clean. For contact probing, unload the filament: a drop of plastic
+  on the tip goes straight into the result.
+- The reference tool is T0 unless you choose otherwise. It always has offset 0;
+  all other offsets are relative to it. `SET_INITIAL_TOOL TOOL=<n>` changes it.
 
-**If you're using the ATOM TC-6 toolchanger**, see the dedicated guide:
-- [**ATOM TC-6 Calibration Guide**](../examples/atom-tc-6tool/CALIBRATION_GUIDE.md)
-
-The ATOM implementation uses enhanced calibration methods:
-- **TAXY** (AI-based XY calibration) - primary method (~5µm precision)
-- **kTAMV** (OpenCV-based XY calibration) - legacy/fallback method
-- **NUDGE** (physical probe) - backup method
-- **Batch calibration** - full matrix XY/Z calibration in one run
-- **Per-tool babystepping** - live Z adjustments during prints
-
-This generic guide covers the standard workflow for all printers.
+All calibration macros home and heat by themselves and save the result with
+`SAVE_CONFIG` at the end, which restarts Klipper. Offsets end up in the
+`[tool T<n>]` sections at the bottom of `printer.cfg`.
 
 ---
 
-## 1. Calibration Philosophy
+## XY offsets
 
-The fork assumes:
+| Method | Command | Measurements | When |
+|---|---|---|---|
+| NUDGE ring | `NUDGE_CALIBRATE_RING_XY` | 12 | Default with NUDGE |
+| NUDGE full | `NUDGE_CALIBRATE_ALL_TOOLS_XY` | 30 | Occasional cross-check |
+| NUDGE single reference | `NUDGE_FIND_TOOL_OFFSETS INITIAL_TOOL=0` | 5 | Quick check |
+| TAXY camera, full | `TAXY_CALIBRATE_ALL_TOOLS_XY` | 30 | Default with camera |
+| TAXY camera, single reference | `TAXY_CALIBRATE_XY INITIAL_TOOL=0` | 5 | Quick check |
 
-- One **reference tool** (usually T0)
-- All other tools are defined **relative** to that reference:
-  - XY offsets (nozzle alignment over the bed)
-  - Z offsets (nozzle tip height)
+### NUDGE probe
 
-This has several advantages:
+The NUDGE is a small pin that the nozzle touches from four sides. From the
+contact points it finds the nozzle centre.
 
-- Changing one tool does **not** force recalibration of every other tool
-- Recovery macros can trust the relative alignment
-- It is easy to add or replace a single tool
-
----
-
-## 2. Prerequisites
-
-Before running any of the calibration helpers, make sure:
-
-- Your printer can home all axes reliably (`G28`)
-- Your Z‑probe is working and has been validated on **at least one** tool
-- Basic pickup and dropoff work for all tools, without collisions
-- The docks are roughly where they should be (no massive misalignment)
-
-**Safety tips:**
-
-- Keep your hand near the emergency stop during first runs
-- Start with conservative movement speeds
-- Never leave the printer unattended during calibration
-
----
-
-## 3. Choosing a Reference Tool
-
-Pick one tool as the **reference** – all others will be aligned to it.
-
-Typical choice:
-
-- T0 = your “main” nozzle (e.g. 0.4 mm generic tool)
-- Mechanically stable
-- Easily accessible
-
-Declare it in Klipper before running calibration helpers:
+**Ring calibration (recommended).** Only neighbouring tools are measured, each pair
+in both directions: T0↔T1, T1↔T2 … T5↔T0. A least-squares adjustment then
+computes one consistent position per tool and writes all offsets, so any tool can
+serve as reference.
 
 ```gcode
-SET_INITIAL_TOOL TOOL=0
+NUDGE_CALIBRATE_RING_XY            # optional: MAX_CLOSURE=0.05
 ```
 
-You can change the reference later, but that will require recalibration.
+Why both directions: every single measurement carries a small constant bias
+(about +0.004 mm in X and Y on the author's printer). It cancels only when a pair
+is measured both ways.
 
----
+The macro checks the **ring closure**: going once around the ring has to end
+where it started. If the gap exceeds `MAX_CLOSURE` (default 0.05 mm), nothing is
+saved. Then run `FIRMWARE_RESTART`, check the probe and the nozzles, and repeat.
 
-## 4. XY Calibration – `NUDGE_FIND_TOOL_OFFSETS`
+On the author's printer, ring and full calibration agreed to 0.005 mm on average
+and 0.006 mm at most, with a ring closure under 0.01 mm. That is far below what
+shows up in a print, so the full run is only needed as an occasional cross-check.
 
-### 4.1. What It Does
-
-`NUDGE_FIND_TOOL_OFFSETS` helps you:
-
-- Align each tool’s XY position to match the reference tool
-- Compute `[tool N]` XY offsets automatically
-- Store those offsets via `SAVE_CONFIG`
-
-It uses a **“nudge until it lines up”** workflow:
-
-1. Move reference tool over a target spot
-2. Switch to another tool
-3. Nudge it until it matches the same spot
-4. Record the delta as that tool’s XY offset
-
-This is much faster and more intuitive than manually measuring & editing
-numbers in the config.
-
----
-
-### 4.2. Preparation
-
-1. Home all axes:
-
-   ```gcode
-   G28
-   ```
-
-2. Heatbed should be at a normal print temperature (optional, but recommended
-   for realistic geometry).
-
-3. Make sure your docks & tools are:
-   - Mounted firmly
-   - Not loose or flexing
-   - Capable of reliable pickup / dropoff
-
-4. Choose a **reference mark** on the bed:
-   - A small printed dot
-   - A crosshair drawn with a marker
-   - A point at a known coordinate (e.g. near bed center)
-
----
-
-### 4.3. Running the Macro
-
-With the reference tool selected:
+**Full calibration.** Every tool is the reference once and measures all others
+(6 × 5 = 30 measurements). Takes about twice as long as the ring.
 
 ```gcode
-SET_INITIAL_TOOL TOOL=0
-NUDGE_FIND_TOOL_OFFSETS INITIAL_TOOL=0
+NUDGE_CALIBRATE_ALL_TOOLS_XY       # optional: SKIP=3 to leave out tool 3
 ```
 
-The macro will:
+**Good to know**
 
-- Move the reference tool to the target area
-- Switch between tools as needed
-- Allow you to manually nudge each non‑reference tool into alignment
+- During NUDGE probing the part fan runs at 25 % and the bed fans at 100 %. This
+  keeps filament residue on the hot nozzle from sticking to the probe pin and
+  dragging it along, which caused failed measurements.
+- Each measured offset is written to `variables.cfg` immediately
+  (`nudge_xy_<reference>_<tool>`). After a disconnect,
+  `NUDGE_RESTORE_OFFSETS SAVE=1` restores them.
+- Probing quality is set in `[tools_calibrate]`: `samples: 3` with
+  `samples_discard: 1` probes 5 times, drops the highest and lowest value and
+  checks the tolerance on the remaining 3. A single outlier no longer forces a
+  full retry.
 
-The exact user interaction (console prompts / UI messages) depends on the
-current version, but the basic idea is always:
+### TAXY camera
 
-1. Place **T0** exactly over the reference mark.
-2. Switch to another tool (T1, T2, …).
-3. Use your UI jog controls to move that tool so the nozzle is exactly
-   over the same mark.
-4. Confirm when aligned (follow the on‑screen instructions).
-5. Macro computes the XY offset between that tool and T0.
-6. Repeat for all tools.
-
----
-
-### 4.4. Saving the Results
-
-When you are satisfied with the alignment:
+[TAXY](https://github.com/PrintStructor/TAXY) finds the nozzle in a camera image
+from below (AI-based detection, a few microns precision). It must be installed
+and the camera configured first.
 
 ```gcode
-SAVE_CONFIG
+TAXY_CAMERA_SETUP TOOL=0           # once: camera model and origin with the reference tool
+TAXY_CALIBRATE_ALL_TOOLS_XY        # full matrix, 30 measurements
+TAXY_RECALIBRATE_TOOL TOOL=3       # re-measure one tool only
+TAXY_BATCH_ABORT                   # stop a running batch
 ```
 
-Klipper will write the computed XY offsets into your config file, typically
-in a section similar to:
-
-```ini
-# Generated by NUDGE_FIND_TOOL_OFFSETS
-# tool offsets relative to T0
-#t1_xy_offset: ...
-#t2_xy_offset: ...
-...
-```
-
-(Exact names may differ depending on your version and configuration.)
-
-Restart Klipper if prompted.
-
 ---
 
-### 4.5. Verifying XY Alignment
+## Z offsets
 
-After saving:
-
-1. Home again: `G28`
-2. Set initial tool: `SET_INITIAL_TOOL TOOL=0`
-3. Move T0 to the reference mark
-4. Switch to another tool (T1…T5)
-5. Each tool should now:
-   - Be directly over the same mark
-   - Only require very small corrections, if any
-
-If a particular tool is still off noticeably:
-
-- Re‑run `NUDGE_FIND_TOOL_OFFSETS` for that tool
-- Or manually tweak its offset section in the config
-
----
-
-## 5. Z Calibration – `MEASURE_TOOL_Z_OFFSETS`
-
-### 5.1. What It Does
-
-`MEASURE_TOOL_Z_OFFSETS`:
-
-- Uses your Z‑probe (Beacon or other) to measure how “tall” each tool is
-- Computes each tool’s Z offset relative to the reference tool
-- Stores those offsets via `SAVE_CONFIG`
-
-This makes sure that:
-
-- When you switch tools, the **first layer height stays consistent**
-- Multi‑tool prints do **not** leave grooves or layer ridges at the tool boundaries
-
----
-
-### 5.2. Preparation
-
-1. Make sure your reference tool (T0) has a **correct** Z offset already,
-   using your normal procedure (e.g. `PROBE_CALIBRATE` + `SAVE_CONFIG`).
-
-2. Heat to normal print temperatures:
-   - Bed: your usual temperature for the material
-   - Tools: typical nozzle temperature
-
-3. Home all axes:
-
-   ```gcode
-   G28
-   ```
-
-4. Set the initial (reference) tool:
-
-   ```gcode
-   SET_INITIAL_TOOL TOOL=0
-   ```
-
----
-
-### 5.3. Running the Macro
-
-With everything homed, heated, and reference set:
+The Beacon probe measures by contact: each nozzle touches the bed, and the height
+difference to the reference tool becomes its Z offset. Measured at 150 °C;
+the thermal compensation adds the expansion at print temperature.
 
 ```gcode
-MEASURE_TOOL_Z_OFFSETS INITIAL_TOOL=0
+BEACON_CALIBRATE_ALL_TOOLS_Z       # full matrix, 30 measurements (recommended)
+BEACON_CALIBRATE_Z INITIAL_TOOL=0  # single reference, 5 measurements
+BEACON_BATCH_ABORT                 # stop a running batch
 ```
 
-The macro will typically:
-
-1. Use the reference tool to establish a baseline vs. the probe
-2. Switch to each tool (T1…)
-3. Probe at defined points
-4. Compute how much higher or lower each tool is relative to T0
-5. Build a table of Z offsets
-
-Depending on your setup, this may take several minutes (especially
-with many tools).
+`BEACON_CALIBRATE_ALL_TOOLS_Z` accepts `PROBE_TEMP` (default 150) and the probing
+position `X_POS`/`Y_POS` (default bed centre).
 
 ---
 
-### 5.4. Saving the Results
+## Thermal compensation
 
-When the macro finishes, review the console output for:
+A nozzle gets longer as it heats up, roughly 0.0005 mm per °C. Between the
+calibration temperature (150 °C) and 250 °C that is about 0.05 mm, enough to ruin
+a first layer. The compensation measures this per tool and corrects it on every
+tool change.
 
-- Any errors / probe failures
-- Reasonable‑looking offsets (usually within a few tenths of a millimeter)
-
-If everything looks good:
-
-```gcode
-SAVE_CONFIG
-```
-
-Klipper will append or update the Z offset values for each tool, e.g.:
-
-```ini
-# tool z offsets relative to T0
-#t1_z_offset: ...
-#t2_z_offset: ...
-...
-```
-
-Restart Klipper if needed.
-
----
-
-### 5.5. Verifying Z Alignment
-
-The simplest verification is a **multi‑tool first layer test**:
-
-1. Slice a small test that uses several tools:
-   - Adjacent squares or stripes
-   - Each region printed by a different tool
-
-2. Print it and observe:
-
-   - Do all areas have a similar first‑layer squish?
-   - Are there visible steps where the tool changes?
-   - Do some regions look too squished or too high?
-
-3. If a tool is clearly off:
-   - Note the tool number
-   - Either:
-     - Re‑run `MEASURE_TOOL_Z_OFFSETS` for that tool, **or**
-     - Manually adjust its Z offset by a small amount and `SAVE_CONFIG`
-
----
-
-## 6. Batch Calibration (v1.1.0+)
-
-For comprehensive calibration, v1.1.0 introduces **batch calibration macros** that perform a full calibration matrix in one run.
-
-### 6.1. XY Batch Calibration – Camera-based
-
-#### Option A: TAXY (Recommended)
-
-This macro uses **TAXY** (AI-based calibration) to measure XY offsets for all tools:
+Calibrate once per tool, with the **filament unloaded**:
 
 ```gcode
-TAXY_CALIBRATE_ALL_TOOLS_XY
-```
-
-**Prerequisites:**
-- TAXY installed and configured ([TAXY by PrintStructor](https://github.com/PrintStructor/TAXY))
-- Camera positioned to view nozzle tip
-- All tools capable of reliable pickup/dropoff
-
-#### Option B: kTAMV (Legacy)
-
-Alternative using OpenCV blob detection:
-
-```gcode
-KTAMV_CALIBRATE_ALL_TOOLS_XY
-```
-
-**Prerequisites:**
-- kTAMV installed and configured ([kTAMV by TypQxQ](https://github.com/PrintStructor/kTAMV))
-
-**What batch calibration does:**
-
-- Uses each tool as initial/reference tool in sequence
-- Measures all other tools relative to it
-- For 6 tools: 6 × 5 = 30 offset measurements
-- Averages results for highest accuracy
-- Automatically saves offsets via `SAVE_CONFIG`
-
-**When to use:**
-
-- Initial setup of a new toolchanger
-- After mechanical changes to multiple tools
-- Periodic recalibration for best accuracy
-
----
-
-### 6.2. Z Batch Calibration – `BEACON_CALIBRATE_ALL_TOOLS_Z`
-
-This macro performs a full Z-offset calibration matrix using Beacon:
-
-```gcode
-BEACON_CALIBRATE_ALL_TOOLS_Z
-```
-
-**What it does:**
-
-- Uses each tool as initial/reference tool in sequence
-- Measures Z-offset for all other tools relative to it
-- For 6 tools: 6 × 5 = 30 Z-offset measurements
-- Averages results for highest accuracy
-- Automatically saves offsets via `SAVE_CONFIG`
-
-**Prerequisites:**
-
-- Beacon probe installed and calibrated
-- All tools heated to print temperature
-- Bed at print temperature
-
-**When to use:**
-
-- After XY calibration is complete
-- After nozzle changes on multiple tools
-- Periodic recalibration for consistent first layers
-
----
-
-## 7. Per-Tool Z Babystepping (v1.1.0+)
-
-During printing, you may notice that individual tools need slight Z adjustments. Instead of stopping and recalibrating, use **per-tool Z babystepping**.
-
-### 7.1. Live Z Adjustment – `SET_TOOL_Z_ADJUST`
-
-Adjust Z-offset for a specific tool during printing:
-
-```gcode
-# Adjust current tool
-SET_TOOL_Z_ADJUST Z=+0.02
-
-# Adjust specific tool
-SET_TOOL_Z_ADJUST TOOL=3 Z=-0.01
-
-# Reset tool to calibrated value
-SET_TOOL_Z_ADJUST TOOL=2 RESET=1
-```
-
-**Parameters:**
-
-| Parameter | Description |
-|-----------|-------------|
-| `TOOL=n` | Tool number (0-5). Default: current tool |
-| `Z=±value` | Offset adjustment in mm (positive = higher) |
-| `RESET=1` | Reset to original calibrated offset |
-
-**Key features:**
-
-- Adjustments are stored in **RAM only** (no SD card writes during print)
-- Changes apply immediately to the specified tool
-- Works for ALL tools including the initial/reference tool
-- Safe to use mid-print without pausing
-
----
-
-### 7.2. Global Z Adjustment – `GLOBAL_Z_ADJUST`
-
-Adjust Z-offset for **all tools equally** at once:
-
-```gcode
-# Move all tools 0.02mm higher
-GLOBAL_Z_ADJUST Z=+0.02
-
-# Move all tools 0.01mm lower
-GLOBAL_Z_ADJUST Z=-0.01
-```
-
-**When to use:**
-
-- First layer is consistently too high/low across all tools
-- Bed temperature change affecting overall Z height
-- Quick adjustment without per-tool tuning
-
----
-
-### 7.3. Saving Adjustments – `SAVE_TOOL_Z_ADJUSTMENTS`
-
-After the print completes successfully, save the adjustments permanently:
-
-```gcode
-SAVE_TOOL_Z_ADJUSTMENTS
-```
-
-**What it does:**
-
-- Writes current Z adjustments to config via `SAVE_CONFIG`
-- Adjustments become the new calibrated offsets
-- Klipper restarts to apply changes
-
-**Best practice workflow:**
-
-1. Start print, observe first layer
-2. Use `SET_TOOL_Z_ADJUST` or `GLOBAL_Z_ADJUST` as needed
-3. Complete the print
-4. If satisfied, run `SAVE_TOOL_Z_ADJUSTMENTS`
-5. If not satisfied, adjustments are discarded on next restart
-
----
-
-## 8. Thermal Expansion Compensation
-
-Nozzles expand as they heat up, changing the effective Z-offset between cold calibration (150°C) and actual printing temperatures (200-300°C). The thermal compensation system automatically adjusts Z-offsets based on nozzle temperature.
-
-### 8.1. How Thermal Compensation Works
-
-**The Problem:**
-- Beacon Z-calibration is done at 150°C (for consistent measurements)
-- During printing, nozzles can be 200-300°C
-- Temperature difference causes nozzle expansion: ~0.5-0.7µm per °C
-- At 270°C vs 150°C (ΔT=120°C), expansion is ~68µm (0.068mm)
-
-**The Solution:**
-- `BEACON_CALIBRATE_NOZZLE_TEMP_OFFSET` measures expansion coefficient per tool
-- `APPLY_NOZZLE_TEMP_OFFSET` applies compensation during prints
-- Compensation is temperature-dependent and tool-specific
-
-### 8.2. Calibrating Thermal Expansion Coefficients
-
-Run this **once per tool** to measure thermal expansion:
-
-```gcode
-BEACON_CALIBRATE_NOZZLE_TEMP_OFFSET INITIAL_TOOL=0
-```
-
-**What happens:**
-1. Tool heats to 150°C (reference temperature)
-2. Measures Z-offset at 150°C
-3. Heats to multiple temperatures (180°C, 210°C, 240°C, 270°C)
-4. Measures Z-offset at each temperature
-5. Calculates linear expansion coefficient (mm/°C)
-6. Saves coefficient to `variables.cfg`
-
-**Repeat for all tools:**
-```gcode
+BEACON_CALIBRATE_NOZZLE_TEMP_OFFSET INITIAL_TOOL=0      # optional: TEMP_LOW=150 TEMP_HIGH=250
 BEACON_CALIBRATE_NOZZLE_TEMP_OFFSET INITIAL_TOOL=1
-BEACON_CALIBRATE_NOZZLE_TEMP_OFFSET INITIAL_TOOL=2
-# ... etc for T3-T5
+# ... up to T5
 ```
 
-### 8.3. Applying Thermal Compensation During Prints
+The macro measures at both temperatures (3 samples each) and stores the
+coefficient as `nozzle_expansion_coefficient_t<n>` in `variables.cfg`.
+Normal values are 0.0004 to 0.0008 mm/°C. During the calibration it raises
+Beacon's contact temperature limit temporarily and restores it afterwards.
 
-Thermal compensation is **automatically applied** in `PRINT_START`:
+Applied automatically: after every tool change and in `PRINT_START`
+(`APPLY_NOZZLE_TEMP_OFFSET`). By hand:
 
 ```gcode
-# Inside PRINT_START macro
-APPLY_NOZZLE_TEMP_OFFSET TOOL={initial_tool}
-```
-
-**Manual application** (if needed):
-```gcode
-# Apply for current tool
-APPLY_NOZZLE_TEMP_OFFSET
-
-# Apply for specific tool
+SHOW_NOZZLE_TEMP_OFFSET            # coefficients and current correction of all tools
 APPLY_NOZZLE_TEMP_OFFSET TOOL=2
-```
-
-**Clear compensation:**
-```gcode
 CLEAR_NOZZLE_TEMP_OFFSET
 ```
 
-### 8.4. Understanding the Output
-
-When `APPLY_NOZZLE_TEMP_OFFSET` runs, you'll see:
-
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Thermal Offset Applied (T0)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Nozzle temp:    270.4°C
-Reference:      150.0°C
-ΔT:             120.4°C
-Coefficient:    0.00056944 mm/°C
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Z offset:       +0.0686mm (68.6µm)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
-
-This means:
-- Nozzle is 120.4°C hotter than calibration temperature
-- Expansion is 0.686µm per degree
-- Total Z-offset compensation: +0.0686mm
-
-**Important:** This offset is **added** to the base Z-offset via `Z_ADJUST`, so it doesn't overwrite calibrated values.
-
-### 8.5. When to Recalibrate Thermal Coefficients
-
-Re-run `BEACON_CALIBRATE_NOZZLE_TEMP_OFFSET` when:
-
-- You change nozzles or hotends
-- You notice first-layer issues at different temperatures
-- You switch to a different nozzle material (brass vs hardened steel)
-- Coefficients seem incorrect (excessive or no compensation)
-
-**Normal coefficient range:** 0.0004 - 0.0008 mm/°C
-
-If your coefficient is outside this range, check:
-- Beacon probe stability
-- Mechanical play in the toolhead
-- Bed mesh consistency
-
-### 8.6. Integration with Other Z-Offset Systems
-
-Thermal compensation works **in addition to**:
-
-1. **Base Z-offsets** (from `MEASURE_TOOL_Z_OFFSETS`)
-2. **Per-tool adjustments** (from `SET_TOOL_Z_ADJUST`)
-3. **Global adjustments** (from `GLOBAL_Z_ADJUST`)
-
-**Order of application:**
-```
-Final Z = Base Z-offset + Thermal compensation + Live adjustments
-```
-
-**Example:**
-- Base Z-offset for T1: -0.1503mm (calibrated)
-- Thermal compensation: +0.0686mm (at 270°C)
-- Live adjustment: +0.02mm (user tweak)
-- **Final Z-offset: -0.0617mm**
-
-### 8.7. Troubleshooting Thermal Compensation
-
-**Compensation not visible in UI:**
-- Check PRINT_START order: `APPLY_NOZZLE_TEMP_OFFSET` must run **after** `SET_INITIAL_TOOL`
-- Verify thermal offset is being applied (check console output)
-
-**Coefficient is 0.0:**
-- Tool hasn't been calibrated yet
-- Run `BEACON_CALIBRATE_NOZZLE_TEMP_OFFSET INITIAL_TOOL=X`
-
-**First layer still wrong:**
-- Thermal compensation fixes temperature-related expansion only
-- Check base Z-offsets are correct
-- Verify bed mesh is active
-- Consider per-tool Z-adjust for fine-tuning
-
-For detailed thermal calibration procedures, see [THERMAL_COMPENSATION.md](THERMAL_COMPENSATION.md).
+Recalibrate after a nozzle or hotend change.
 
 ---
 
-## 9. When to Re‑Calibrate
+## Z babystepping during a print
 
-Re‑run **XY calibration** (`NUDGE_FIND_TOOL_OFFSETS`) when:
-
-- You move or re‑print a dock
-- You change a toolhead mechanically (hotend, carriage, etc.)
-- You notice misalignment between colors / tools in finished prints
-
-Re‑run **Z calibration** (`MEASURE_TOOL_Z_OFFSETS`) when:
-
-- You change a nozzle length (e.g. different brand / style)
-- You alter the hotend stack on a tool
-- You see consistent first‑layer differences between tools
-
-As a rule of thumb:
-
-- **Minor firmware / slicer changes:** no recalibration needed
-- **Mechanical changes to a tool or dock:** re‑calibrate that tool
-- **Changes to probe mount / bed hardware:** re‑calibrate Z for all tools
-
----
-
-## 10. Troubleshooting Calibration Issues
-
-### 10.1. Tool Crashes During Calibration
-
-- Stop immediately (emergency stop)
-- Check:
-  - Dock positions in `T*.cfg`
-  - Homing and axis limits
-  - That reference tool is correctly set (`SET_INITIAL_TOOL`)
-
-Before retrying, manually test pickup/dropoff at **reduced speeds**.
-
----
-
-### 10.2. Offsets Are Huge or Nonsense
-
-If the computed offsets are clearly wrong (e.g. many millimeters off):
-
-- Do **not** trust them
-- Restore from backup or remove the bad offsets from `printer.cfg`
-- Reboot Klipper
-- Investigate:
-  - Wrong reference tool used?
-  - Probe misconfigured?
-  - Mechanical looseness (e.g. loose tool, bent dock)?
-
-Then repeat the relevant calibration step more carefully.
-
----
-
-### 10.3. First Layer Still Inconsistent
-
-If Z offsets look okay but first layer quality still differs:
-
-- Check:
-  - Bed mesh is active and consistent
-  - Per‑tool temperature differences (different materials)
-  - Tool cooling (extreme fan differences can curve parts)
-- Consider:
-  - Using a calibration print that exercises *only Z* first, without tool changes
-
----
-
-## 11. Summary
-
-### Quick Start (Standard Workflow)
-
-1. **Pick a reference tool** (usually T0) and set it:
-
-   ```gcode
-   SET_INITIAL_TOOL TOOL=0
-   ```
-
-2. **Calibrate XY** for all tools:
-
-   ```gcode
-   NUDGE_FIND_TOOL_OFFSETS INITIAL_TOOL=0
-   SAVE_CONFIG
-   ```
-
-3. **Calibrate Z** for all tools:
-
-   ```gcode
-   MEASURE_TOOL_Z_OFFSETS INITIAL_TOOL=0
-   SAVE_CONFIG
-   ```
-
-4. **Verify**:
-   - Tools line up over a common mark
-   - First layers are consistent for all tools
-
-### Full Matrix Calibration (v1.1.0+)
-
-For maximum accuracy, use batch calibration:
+Fine adjustments while printing, kept in memory until you save them:
 
 ```gcode
-# Full XY matrix (requires TAXY or kTAMV)
-TAXY_CALIBRATE_ALL_TOOLS_XY    # AI-based (recommended)
-# or: KTAMV_CALIBRATE_ALL_TOOLS_XY  # OpenCV-based (legacy)
-
-# Full Z matrix (requires Beacon)
-BEACON_CALIBRATE_ALL_TOOLS_Z
+SET_TOOL_Z_ADJUST Z=0.02           # current tool 0.02 mm higher
+SET_TOOL_Z_ADJUST TOOL=3 Z=-0.01   # a specific tool
+SET_TOOL_Z_ADJUST TOOL=3 RESET=1   # back to the calibrated value
+GLOBAL_Z_ADJUST Z=-0.01            # all tools at once
+SHOW_TOOL_Z_ADJUSTMENTS
+SAVE_TOOL_Z_ADJUSTMENTS            # make them permanent (SAVE_CONFIG, restarts Klipper)
 ```
 
-### Live Adjustments During Print (v1.1.0+)
+The babystep buttons in Mainsail/Fluidd also act on the current tool only.
+Unsaved adjustments are lost on the next restart.
 
-Fine-tune Z-offsets without recalibration:
+How the Z offset of a tool is put together:
 
-```gcode
-# Adjust single tool
-SET_TOOL_Z_ADJUST TOOL=2 Z=+0.02
-
-# Adjust all tools
-GLOBAL_Z_ADJUST Z=-0.01
-
-# Save after successful print
-SAVE_TOOL_Z_ADJUSTMENTS
+```
+Z = calibrated offset + thermal compensation + babystep of the tool + global adjust
 ```
 
 ---
 
-Once these steps are done, your tool offsets should be solid enough
-to run real multi‑tool prints with confidence.
+## Checking the result
 
-For deeper background, see [ABOUT.md](ABOUT.md).
+- **XY:** print a multi-tool calibration pattern (for example, lines or crosses
+  from every tool on top of each other) and compare the positions.
+- **Z:** print a single-layer pattern with every tool; all tools should look the same.
+
+## When to recalibrate
+
+| Change | Recalibrate |
+|---|---|
+| Dock moved or reprinted, toolhead rebuilt | XY of this tool (or ring) |
+| Nozzle or hotend changed | Z and thermal compensation of this tool, check XY |
+| Probe, bed or build plate changed | Z of all tools |
+| Colours misaligned in prints | XY |
+| First layer differs between tools | Z |
+
+## If the results look wrong
+
+- Offsets of several millimetres are always an error: wrong reference tool, a loose
+  tool or a probe problem. Do not print with them.
+- Restore the previous values from a `printer-<date>.cfg` backup (written by
+  `SAVE_CONFIG`) or with `NUDGE_RESTORE_OFFSETS`.
+- More in [Troubleshooting](TROUBLESHOOTING.md#calibration).

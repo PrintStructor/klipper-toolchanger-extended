@@ -10,11 +10,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **NUDGE ring calibration** (`NUDGE_CALIBRATE_RING_XY`, `atom/nudge_ring.cfg`)
+  - Neighbouring tools only, both directions: 12 instead of 30 measurements
+  - Least-squares adjustment, ring closure check (`MAX_CLOSURE`), writes all offsets
+  - Agrees with the full 30-measurement run to about 0.005 mm on the author's printer
+- **Trimmed-mean probing** for NUDGE (`samples_discard` / `SAMPLES_DISCARD`)
+- **Crash-safe NUDGE results**: every XY offset is written to `variables.cfg` immediately
+- **Tool state check**: no tool change while Klipper and the detection sensors disagree
+- Example config synced with the author's printer: nozzle wipe, bed fans,
+  input shaper macros for closed-loop X/Y, sensorless homing via `virtual_endstop`
 - **TAXY Integration** – AI-based XY calibration as primary method
   - YOLOv8 nozzle detection with ~5µm precision
   - More robust than OpenCV blob detection across lighting conditions
   - [TAXY GitHub](https://github.com/PrintStructor/TAXY)
   - kTAMV remains as legacy/fallback option
+
+### Changed
+- `INITIALIZE_TOOLCHANGER` clears a stale tool when the shuttle is reported empty
+- Non-fatal toolchanger errors are reported once, as a red error line
+- Tool detection pins are debounced (`debounce_delay`)
+- NUDGE probing runs part fan 25 % and bed fans 100 % (prevents residue sticking to the pin)
+- Documentation rewritten and merged: README, INSTALLATION, CONFIGURATION,
+  CALIBRATION, TROUBLESHOOTING (replaces QUICKSTART, UPGRADE, ABOUT, FAQ,
+  THERMAL_COMPENSATION and the example CALIBRATION_GUIDE)
 
 ### Fixed
 - **Initial Tool Z-Offset Bug** (`toolchanger.py`)
