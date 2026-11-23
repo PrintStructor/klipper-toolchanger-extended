@@ -3,7 +3,9 @@
 The complete configuration of the author's printer, in daily use:
 
 - VORON 2.4, 350 mm, with 6 ATOM toolheads on CAN toolhead boards
-- Beacon RevH (Z offsets, bed mesh), NUDGE probe and camera (XY offsets)
+- ATOM: created together with Alex from APDMachine, developed further by PrintStructor;
+  runs on the Fysetc CNC shuttle for Stealthchanger
+- Beacon RevH (Z offsets, bed mesh), NUDGE probe (XY offsets)
 - CPAP part cooling on the shuttle, bed fans, per-tool filament sensors, LED effects
 - Optional: closed-loop X/Y with TMC4671 (Ouroboros board)
 
@@ -18,8 +20,6 @@ atom-tc-6tool/
 ├── printer.cfg                  main config, includes, saved offsets at the bottom
 ├── macros.cfg                   PRINT_START/END, PAUSE/RESUME, filament load/unload
 ├── variables.cfg                calibration data (written by macros)
-├── taxy-macros.cfg              TAXY camera calibration
-├── ktamv-macros.cfg             kTAMV camera calibration (legacy, not included by default)
 ├── bedfans.cfg                  bed fan control
 ├── helix_macros.cfg             HelixScreen display macros (author-specific)
 ├── mainsail.cfg, crowsnest.conf web UI and camera
@@ -29,7 +29,7 @@ atom-tc-6tool/
     ├── toolchanger.cfg          [toolchanger] and the tool change sequence
     ├── toolchanger_macros.cfg   TC_INIT, PARK_TOOLHEAD, PICKUP_TOOL, ...
     ├── T0.cfg … T5.cfg          one file per tool
-    ├── tool_calibration.cfg     NUDGE probe, TAXY/NUDGE/Beacon calibration, Z adjust
+    ├── tool_calibration.cfg     NUDGE probe, NUDGE/Beacon calibration, Z adjust
     ├── nudge_ring.cfg           NUDGE ring calibration (12 measurements)
     ├── beacon.cfg               Beacon probe
     ├── beacon_diagnostics.cfg   thermal compensation, probe tests

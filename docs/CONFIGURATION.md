@@ -12,7 +12,7 @@ settings do. Values not mentioned here can usually stay as they are.
 | `atom/toolchanger.cfg` | `[toolchanger]` settings and the tool change sequence (pickup in two stages, dropoff, error handling) |
 | `atom/T0.cfg` … `T5.cfg` | One file per tool: toolhead MCU, extruder, fans, sensors, dock position, input shaper |
 | `atom/toolchanger_macros.cfg` | `TC_INIT`, `SET_INITIAL_TOOL`, `PARK_TOOLHEAD`, `PICKUP_TOOL`, `TOOLCHANGE_DEMO` |
-| `atom/tool_calibration.cfg` | NUDGE probe hardware (`[tools_calibrate]`), TAXY, NUDGE and Beacon calibration macros, Z adjust |
+| `atom/tool_calibration.cfg` | NUDGE probe hardware (`[tools_calibrate]`), NUDGE and Beacon calibration macros, Z adjust |
 | `atom/nudge_ring.cfg` | NUDGE ring calibration |
 | `atom/beacon.cfg` | Beacon probe |
 | `atom/beacon_diagnostics.cfg` | Thermal compensation, probe and gantry tests |
@@ -32,12 +32,46 @@ not have.
    toolhead board in `T<n>.cfg`.
 2. **Pins:** heaters, thermistors, fans, detection pins, if your boards differ.
 3. **Dock positions:** `params_park_x`, `params_park_y`, `params_park_z` per tool.
+   The example values only fit the author's printer. Determine them on yours, see
+   [below](#dock-positions-and-speed-do-this-first).
 4. **NUDGE probe:** `pin` and position in `[tools_calibrate]` and in
    `NUDGE_MOVE_OVER_PROBE`, if you use one.
 5. **Fan names** in the calibration macros (`fan0`, `BedFans`), if yours differ.
 6. **Calibration values:** delete the author's offsets (the `#*# [tool T<n>]`
    entries at the bottom of `printer.cfg`) and the contents of `variables.cfg`,
    then calibrate your own.
+
+## Dock positions and speed: do this first
+
+> **Warning:** Do not run a tool change with the example dock positions or the
+> example speeds. A wrong dock position at full speed crashes the toolhead into
+> the dock.
+
+**1. Reduce the speed considerably** in `atom/toolchanger.cfg` before the first
+tool change, for example:
+
+```ini
+params_fast_speed: 6000     # example config: 27000 (450 mm/s); here 100 mm/s
+params_path_speed: 1200     # example config: 3000 (50 mm/s);  here 20 mm/s
+```
+
+Go back to the higher values step by step only when every tool docks and
+undocks cleanly.
+
+**2. Determine the park position of every dock.** The park position is where the
+shuttle stands when the tool sits exactly in its dock.
+
+1. Home (`G28`) and leave the shuttle empty.
+2. Put the tool by hand onto the shuttle, so it hangs in front of its dock.
+3. Jog slowly in small steps (0.1 to 1 mm) until the tool sits in the dock
+   without force: centred in X, fully in Y, at the correct height in Z.
+4. Read the position with `M114` and enter it as `params_park_x`,
+   `params_park_y` and `params_park_z` in `T<n>.cfg`.
+5. Repeat for every tool, then test each change slowly with `T<n>` and
+   `PARK_TOOLHEAD`, hand on the emergency stop.
+
+Docks are rarely exactly in line: measure every dock, do not copy the values
+from one tool to the next.
 
 ## `[toolchanger]` (atom/toolchanger.cfg)
 
@@ -46,8 +80,8 @@ not have.
 | `params_max_tool_count` | 6 | Number of tools |
 | `params_safe_y` | 110 | Y position that is safe for moves in X in front of the docks |
 | `params_close_y` | 35 | Y position just in front of the docks |
-| `params_fast_speed` | 27000 | Travel speed in mm/min. Lower it for the first tests |
-| `params_path_speed` | 3000 | Speed of the dock path in mm/min |
+| `params_fast_speed` | 27000 | Travel speed in mm/min. Reduce considerably for the first tests (see above) |
+| `params_path_speed` | 3000 | Speed of the dock path in mm/min. Reduce for the first tests |
 | `params_atom_dock_path` | list | Moves in and out of the dock, relative to the dock position |
 | `verify_tool_pickup` | true | Check the tool sensor after the first pickup stage |
 | `initialize_on` | first-use | Initialise on the first tool command |
@@ -89,6 +123,7 @@ XY and Z offsets are not entered by hand; the calibration writes them.
 
 - [ ] Klipper starts without errors.
 - [ ] `DEBUG_TOOL_DETECTION` is correct with an empty shuttle and with every tool.
+- [ ] Park position of every dock determined on this printer.
 - [ ] Every tool changes reliably at reduced speed, then at full speed.
 - [ ] `PAUSE`/`RESUME` work during a test print.
 - [ ] XY, Z and thermal compensation are calibrated ([Calibration](CALIBRATION.md)).

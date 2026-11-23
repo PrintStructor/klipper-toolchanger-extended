@@ -19,20 +19,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tool state check**: no tool change while Klipper and the detection sensors disagree
 - Example config synced with the author's printer: nozzle wipe, bed fans,
   input shaper macros for closed-loop X/Y, sensorless homing via `virtual_endstop`
-- **TAXY Integration** – AI-based XY calibration as primary method
-  - YOLOv8 nozzle detection with ~5µm precision
-  - More robust than OpenCV blob detection across lighting conditions
-  - [TAXY GitHub](https://github.com/PrintStructor/TAXY)
-  - kTAMV remains as legacy/fallback option
 
 ### Changed
 - `INITIALIZE_TOOLCHANGER` clears a stale tool when the shuttle is reported empty
 - Non-fatal toolchanger errors are reported once, as a red error line
 - Tool detection pins are debounced (`debounce_delay`)
 - NUDGE probing runs part fan 25 % and bed fans 100 % (prevents residue sticking to the pin)
+- Hardware credits: ATOM toolhead created together with Alex (APDMachine), developed
+  further by PrintStructor; compatible with the Fysetc CNC shuttle for Stealthchanger
+- Configuration guide: determine every dock's park position and reduce speeds for the first tests
 - Documentation rewritten and merged: README, INSTALLATION, CONFIGURATION,
   CALIBRATION, TROUBLESHOOTING (replaces QUICKSTART, UPGRADE, ABOUT, FAQ,
   THERMAL_COMPENSATION and the example CALIBRATION_GUIDE)
+
+### Removed
+- **TAXY and kTAMV camera calibration**: XY calibration is done with the NUDGE probe only.
+  Removed `kTAMV/`, `taxy-macros.cfg`, `ktamv-macros.cfg`, the TAXY macros in
+  `tool_calibration.cfg`, `tool_xy_calibration.py` and the kTAMV step of `install.sh`
 
 ### Fixed
 - **Initial Tool Z-Offset Bug** (`toolchanger.py`)

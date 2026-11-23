@@ -6,7 +6,7 @@ the same spot.
 
 Order for a new printer:
 
-1. [XY offsets](#xy-offsets): camera (TAXY) or NUDGE probe
+1. [XY offsets](#xy-offsets): NUDGE probe
 2. [Z offsets](#z-offsets): Beacon contact probe
 3. [Thermal compensation](#thermal-compensation): once per tool
 4. [Check with a test print](#checking-the-result), fine-tune with
@@ -36,10 +36,7 @@ All calibration macros home and heat by themselves and save the result with
 | NUDGE ring | `NUDGE_CALIBRATE_RING_XY` | 12 | Default with NUDGE |
 | NUDGE full | `NUDGE_CALIBRATE_ALL_TOOLS_XY` | 30 | Occasional cross-check |
 | NUDGE single reference | `NUDGE_FIND_TOOL_OFFSETS INITIAL_TOOL=0` | 5 | Quick check |
-| TAXY camera, full | `TAXY_CALIBRATE_ALL_TOOLS_XY` | 30 | Default with camera |
-| TAXY camera, single reference | `TAXY_CALIBRATE_XY INITIAL_TOOL=0` | 5 | Quick check |
-
-### NUDGE probe
+| NUDGE one tool | `NUDGE_FIND_TOOL_OFFSET` | 1 | Current tool only |
 
 The NUDGE is a small pin that the nozzle touches from four sides. From the
 contact points it finds the nozzle centre.
@@ -84,19 +81,6 @@ NUDGE_CALIBRATE_ALL_TOOLS_XY       # optional: SKIP=3 to leave out tool 3
   `samples_discard: 1` probes 5 times, drops the highest and lowest value and
   checks the tolerance on the remaining 3. A single outlier no longer forces a
   full retry.
-
-### TAXY camera
-
-[TAXY](https://github.com/PrintStructor/TAXY) finds the nozzle in a camera image
-from below (AI-based detection, a few microns precision). It must be installed
-and the camera configured first.
-
-```gcode
-TAXY_CAMERA_SETUP TOOL=0           # once: camera model and origin with the reference tool
-TAXY_CALIBRATE_ALL_TOOLS_XY        # full matrix, 30 measurements
-TAXY_RECALIBRATE_TOOL TOOL=3       # re-measure one tool only
-TAXY_BATCH_ABORT                   # stop a running batch
-```
 
 ---
 

@@ -46,7 +46,7 @@ The usual layout keeps the toolchanger files in an `atom/` folder next to
 [include atom/T3.cfg]
 [include atom/T4.cfg]
 [include atom/T5.cfg]
-[include atom/tool_calibration.cfg]     # TAXY, NUDGE and Beacon calibration
+[include atom/tool_calibration.cfg]     # NUDGE and Beacon calibration
 [include atom/nudge_ring.cfg]           # NUDGE ring calibration (optional)
 [include atom/beacon_diagnostics.cfg]   # thermal compensation, probe tests
 [include macros.cfg]                    # PRINT_START, PAUSE/RESUME, filament
@@ -76,8 +76,10 @@ If a sensor reports the wrong state, fix it now (see
 
 ## 4. First tool change
 
-Lower the speeds in `toolchanger.cfg` for the first run (`params_fast_speed`,
-`params_path_speed`), keep a hand near the emergency stop, then:
+First determine the park position of every dock and reduce the speeds
+considerably, as described in
+[Configuration](CONFIGURATION.md#dock-positions-and-speed-do-this-first).
+Keep a hand near the emergency stop, then:
 
 ```gcode
 G28

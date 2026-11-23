@@ -19,7 +19,7 @@ hardware/
 
 ## ATOM Toolhead System
 
-The **ATOM toolhead** is an exclusive design created by the developer of the **Reaper Toolhead**, specifically engineered for this toolchanger project.
+The **ATOM toolhead** was created together with Alex from **APDMachine** (developer of the Reaper Toolhead) and has been developed further by PrintStructor. It is compatible with the **Fysetc CNC shuttle for Stealthchanger**.
 
 ### Key Features:
 - **Simple 4-point dock path** - Reliable and easy to tune

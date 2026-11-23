@@ -12,6 +12,10 @@
 A Klipper toolchanger extension with safety checks, error recovery and a
 complete, working configuration for a 6-tool VORON 2.4 with ATOM toolheads.
 
+The ATOM toolhead was created together with Alex from APDMachine and has been
+developed further by PrintStructor. It is compatible with the
+**Fysetc CNC shuttle for Stealthchanger**.
+
 Based on [viesturz/klipper-toolchanger](https://github.com/viesturz/klipper-toolchanger).
 
 ---
@@ -26,9 +30,9 @@ Based on [viesturz/klipper-toolchanger](https://github.com/viesturz/klipper-tool
 - Errors pause the print instead of stopping the printer, so it can be resumed.
 
 **Calibration**
-- XY offsets with a camera ([TAXY](https://github.com/PrintStructor/TAXY)) or the
-  [NUDGE](https://github.com/zruncho3d/nudge) contact probe.
+- XY offsets with the [NUDGE](https://github.com/zruncho3d/nudge) contact probe.
 - NUDGE **ring calibration**: 12 measurements instead of 30, same result within a few microns.
+- Outlier-resistant probing and cooling during probing for repeatable results.
 - Z offsets with the Beacon contact probe, as a full matrix of all tools.
 - Thermal expansion compensation of the nozzle, calibrated per tool.
 - Per-tool Z babystepping during a print, and a global Z adjust for all tools.
@@ -81,7 +85,6 @@ Then follow the guides in this order:
 | `examples/atom-tc-6tool/` | The author's complete printer configuration ([overview](examples/atom-tc-6tool/README.md)) |
 | `docs/` | Guides |
 | `hardware/` | ATOM toolhead hardware notes |
-| `kTAMV/` | Legacy camera calibration (replaced by TAXY) |
 
 ### Python modules
 
@@ -90,7 +93,6 @@ Then follow the guides in this order:
 | `toolchanger.py` | Core logic: tool changes, detection, safety checks, error handling |
 | `tool.py` | Tool definition and detection pin |
 | `tools_calibrate.py` | NUDGE probing for XY offsets |
-| `tool_xy_calibration.py` | Saves camera-measured XY offsets |
 | `tool_z_adjust.py` | Per-tool Z babystepping |
 | `rounded_path.py` | Smooth paths for dock moves |
 | `tc_beacon_capture.py` | Collects Beacon readings for Z calibration (via Moonraker) |
@@ -105,13 +107,12 @@ Then follow the guides in this order:
 **Required:** [Beacon](https://github.com/beacon3d/beacon_klipper) for Z calibration and bed mesh.
 
 **Recommended:**
-[TAXY](https://github.com/PrintStructor/TAXY) (camera XY calibration),
+[NUDGE](https://github.com/zruncho3d/nudge) probe (XY calibration),
 [Klipper LED Effect](https://github.com/julianschill/klipper-led_effect),
 [Shake&Tune](https://github.com/Frix-x/klippain-shaketune),
 [TMC Autotune](https://github.com/andrewmcgr/klipper_tmc_autotune).
 
 **Optional:**
-[NUDGE](https://github.com/zruncho3d/nudge) probe,
 [gcode_shell_command](https://github.com/dw-0/kiauh) (only for KNOMI sleep/wake),
 [TMC4671 driver](https://github.com/andrewmcgr/tmc-4671) (closed-loop option).
 
@@ -120,8 +121,9 @@ Then follow the guides in this order:
 ## Credits
 
 - [viesturz/klipper-toolchanger](https://github.com/viesturz/klipper-toolchanger): original toolchanger framework
-- [NUDGE](https://github.com/zruncho3d/nudge) by Zruncho, [kTAMV](https://github.com/PrintStructor/kTAMV) by TypQxQ
-- ATOM toolhead by Alex (APDMachine); shuttle based on ClickChanger/Stealthchanger
+- [NUDGE](https://github.com/zruncho3d/nudge) by Zruncho
+- ATOM toolhead: created together with Alex (APDMachine), developed further by PrintStructor;
+  compatible with the Fysetc CNC shuttle for Stealthchanger
 - Extensions, calibration workflows and configuration by PrintStructor
 
 Bugs and ideas: please open an issue with your Klipper version, the relevant config
