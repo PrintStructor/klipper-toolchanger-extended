@@ -14,7 +14,9 @@
   [update_manager mainsail] of moonraker.conf.
   Mainsail: Settings > Webcams > add, Service "HTML/iFrame",
   URL /toolchanger-panel.html, aspect ratio e.g. 2:1.
-  Optional URL parameter: ?moonraker=host:port (default: same host).
+  Optional URL parameters: ?moonraker=host:port (default: same host),
+  board_warn=70&board_bad=85 (toolhead board temperature limits in °C),
+  board_sensor=T%d (name of the board sensor, %d = tool number).
 -->
 <style>
   :root {
@@ -99,6 +101,8 @@
   .bar i { display: block; height: 100%; width: 0; background: var(--muted); transition: width .4s; }
   .bar i.heating { background: var(--hot); }
   .bar i.at { background: var(--ok); }
+  .row .warn { color: var(--warn) !important; font-weight: 600; }
+  .row .bad { color: var(--bad) !important; font-weight: 600; }
   .foot { color: var(--muted); font-size: 11px; margin-top: 8px; }
   .foot code { color: var(--text); }
 </style>
@@ -128,6 +132,10 @@
 (() => {
   const params = new URLSearchParams(location.search);
   const host = params.get('moonraker') || location.host;
+  const BOARD_WARN = parseFloat(params.get('board_warn')) || 70;
+  const BOARD_BAD = parseFloat(params.get('board_bad')) || 85;
+  const BOARD_SENSOR = params.get('board_sensor') || 'T%d';
+  const boardObj = (i) => 'temperature_sensor ' + BOARD_SENSOR.replace('%d', i);
   const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + host + '/websocket';
 
   const state = {};          // merged Klipper object status
@@ -168,6 +176,7 @@
     };
     names.forEach((n) => { objects[n] = ['tool_number', 'detect_state', 'active', 'extruder', 'z_offsets', 'xy_offsets']; });
     extruders.forEach((e) => { objects[e] = ['temperature', 'target']; });
+    names.forEach((n, i) => { objects[boardObj(i)] = ['temperature']; });
     buildTiles(names);
     subId = send('printer.objects.subscribe', { objects });
   }
@@ -181,8 +190,9 @@
       el.id = 'tool-' + i;
       el.innerHTML = `
         <div class="head"><span class="name">T${i}</span><span class="badge" data-k="badge">–</span></div>
-        <div class="row"><span>Temp</span><span data-k="temp">–</span></div>
+        <div class="row"><span>Hotend</span><span data-k="temp">–</span></div>
         <div class="bar"><i data-k="bar"></i></div>
+        <div class="row"><span>Board</span><span data-k="board">–</span></div>
         <div class="row"><span data-k="zlabel">Z-Offset</span><span data-k="z">–</span></div>`;
       wrap.appendChild(el);
     });
@@ -215,6 +225,7 @@
 
     // Tiles
     const onShuttle = [];
+    const hotBoards = [];
     for (let i = 0; i < toolCount; i++) {
       const t = state['tool T' + i] || {};
       const el = $('tool-' + i);
@@ -235,6 +246,12 @@
       const pct = target ? Math.min(100, (temp / target) * 100) : Math.min(100, (temp || 0) / 3);
       bar.style.width = pct + '%';
       bar.className = target ? (Math.abs(temp - target) <= 3 ? 'at' : 'heating') : '';
+
+      const bt = (state[boardObj(i)] || {}).temperature;
+      const bEl = el.querySelector('[data-k="board"]');
+      bEl.textContent = num(bt) + ' °C';
+      bEl.className = typeof bt !== 'number' ? '' : (bt >= BOARD_BAD ? 'bad' : (bt >= BOARD_WARN ? 'warn' : ''));
+      if (typeof bt === 'number' && bt >= BOARD_WARN) hotBoards.push('T' + i + ' (' + bt.toFixed(0) + ' °C)');
 
       // Z offset of this tool relative to the active (or detected) tool
       const ref = expected >= 0 ? expected : detected;
@@ -258,6 +275,8 @@
       msg = `<b>Widerspruch:</b> Klipper erwartet ${fmtTool(expected)}, die Sensoren melden ${fmtTool(detected)}. Werkzeugwechsel sind gesperrt. Shuttle prüfen, dann <code>INITIALIZE_TOOLCHANGER</code>.`;
     } else if (st === 'error') {
       msg = '<b>Toolchanger im Fehlerzustand.</b> Ursache in der Konsole prüfen, dann <code>INITIALIZE_TOOLCHANGER</code>.';
+    } else if (hotBoards.length) {
+      msg = `<b>Toolhead-Board warm:</b> ${hotBoards.join(', ')}. Grenze in der Config: <code>max_temp</code> des Board-Sensors.`;
     }
     alert.innerHTML = msg;
     alert.classList.toggle('show', !!msg);

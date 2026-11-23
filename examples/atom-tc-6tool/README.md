@@ -44,7 +44,9 @@ atom-tc-6tool/
 
 `mainsail/toolchanger-panel.html` shows live what `DEBUG_TOOL_DETECTION` prints:
 the tool Klipper expects next to the tool the sensors report (red on mismatch),
-every tool's dock/shuttle state, temperatures and Z offsets.
+every tool's dock/shuttle state, hotend and toolhead board temperatures and Z offsets.
+Board temperatures turn yellow at 70 °C and red at 85 °C; change with
+`?board_warn=…&board_bad=…` in the URL.
 
 1. Copy it into the Mainsail folder:
    `cp mainsail/toolchanger-panel.html ~/mainsail/`
